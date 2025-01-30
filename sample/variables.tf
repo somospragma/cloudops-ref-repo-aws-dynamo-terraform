@@ -25,6 +25,13 @@ variable "functionality" {
 
 
 ########### Varibales Secret Manager
+variable "billing_mode" {
+  type    = string
+  validation {
+    condition     = contains(["PAY_PER_REQUEST", "PROVISIONED"], var.billing_mode)
+    error_message = "El valor de 'billing_mode' debe ser 'PAY_PER_REQUEST' o 'PROVISIONED'."
+  }
+}
 variable "read_capacity" {
   type    = number
   default = null  

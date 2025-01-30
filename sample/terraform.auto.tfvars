@@ -25,7 +25,7 @@ common_tags = {
 ###############################################################
 # Variables Dynamo
 ###############################################################
-
+billing_mode    = "PAY_PER_REQUEST"
 #read_capacity  = *Solo si es Provisioned*
 #write_capacity = *Solo si es Provisioned*
 hash_key        = "id"
