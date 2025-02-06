@@ -1,3 +1,7 @@
+###########################################
+########## Common variables ###############
+###########################################
+
 variable "client" {
   type = string
 }
@@ -17,9 +21,13 @@ variable "common_tags" {
 variable "project" {
   type = string  
 }
-variable "functionality" {
+
+variable "application" {
   type = string  
+  description = "Application name"
 }
+
+
 
 
 
@@ -71,7 +79,9 @@ variable "region_name" {
   type    = string
 }
 
-
+variable "functionality" {
+  type = string  
+}
 
 
 

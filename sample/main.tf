@@ -1,8 +1,9 @@
 module "dynamo" {
-  source        = "./module/dynamo"
+  source        = "../"
   client        = var.client
-  functionality = var.functionality
+  application = var.application
   environment   = var.environment
+  project       = var.project
 
   dynamo_config = [
     {
@@ -32,15 +33,8 @@ module "dynamo" {
         }
       ]
 
-      replicas = [
-        # {
-        #   kms_key_arn            = var.replicas_kms #maneja la administrada por AWS
-        #   point_in_time_recovery = var.point_in_time_recovery
-        #   propagate_tags         = var.propagate_tags
-        #   region_name            = var.region_name
-        # }
-      ]
-      application = var.project
+      replicas = []
+      functionality = var.functionality
     }
   ]
 }
