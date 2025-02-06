@@ -1,3 +1,30 @@
+###########################################
+########## Common variables ###############
+###########################################
+
+variable "environment" {
+  type        = string
+  description = "Environment where resources will be deployed"
+}
+
+variable "client" {
+  type        = string
+  description = "Client name"
+}
+
+variable "project" {
+  type        = string
+  description = "Project name"
+}
+
+variable "application" {
+  type = string
+  description = "Application name"
+}
+
+#####################################
+####### Dynamodb variables ##########
+#####################################
 variable "dynamo_config" {
   type = list(object({
     billing_mode   = string
@@ -21,18 +48,7 @@ variable "dynamo_config" {
       propagate_tags = string
       region_name = string
     }))
-    application = string
+    functionality = string
   }))
 }
 
-variable "functionality" {
-  type = string
-}
-
-variable "client" {
-  type = string
-}
-
-variable "environment" {
-  type = string
-}

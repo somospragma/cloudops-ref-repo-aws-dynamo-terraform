@@ -1,6 +1,7 @@
 resource "aws_dynamodb_table" "dynamo_table" {
+  provider = aws.project
   count                       = length(var.dynamo_config) > 0 ? length(var.dynamo_config) : 0
-  name                        = join("-", tolist([var.client, var.dynamo_config[count.index].application, var.environment, var.functionality, "dynamodb", count.index + 1]))
+  name                        = join("-", tolist([var.client, var.project, var.environment, "ddb", var.application,var.dynamo_config[count.index].functionality, count.index + 1]))
   billing_mode                = var.dynamo_config[count.index].billing_mode
   read_capacity               = var.dynamo_config[count.index].read_capacity
   write_capacity              = var.dynamo_config[count.index].write_capacity
@@ -38,5 +39,6 @@ resource "aws_dynamodb_table" "dynamo_table" {
   }
 
 
-  tags = merge({ Name = "${join("-", tolist([var.client, var.dynamo_config[count.index].application, var.environment, var.functionality, "dynamodb", count.index + 1]))}"})
+  tags = merge({ Name = "${join("-", tolist([var.client, var.project, var.environment, "ddb", var.application,var.dynamo_config[count.index].functionality, count.index + 1]))}"})
+  
 }
