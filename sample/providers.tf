@@ -2,6 +2,7 @@
 # Provider AWS
 ######################################################################
 provider "aws" {
+  alias = "principal"
   region  = var.aws_region
   profile = var.profile
 

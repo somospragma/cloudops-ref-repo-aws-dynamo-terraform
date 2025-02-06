@@ -31,8 +31,9 @@ variable "application" {
 
 
 
-
-########### Varibales Secret Manager
+###########################################
+########## DynamoDB variables #############
+###########################################
 variable "billing_mode" {
   type    = string
   validation {
@@ -73,9 +74,6 @@ variable "replicas_kms" {
   default = null  
 }
 variable "propagate_tags" {
-  type    = string
-}
-variable "region_name" {
   type    = string
 }
 

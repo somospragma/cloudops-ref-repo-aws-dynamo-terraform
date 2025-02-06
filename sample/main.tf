@@ -1,4 +1,8 @@
 module "dynamo" {
+  providers = {
+    aws.project = aws.principal
+  }
+
   source        = "../"
   client        = var.client
   application = var.application
@@ -19,10 +23,6 @@ module "dynamo" {
         {
           name = var.hash_key
           type = "S"
-        },
-        {
-          name = var.range_key
-          type = "N"
         }
       ]
 
