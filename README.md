@@ -150,18 +150,18 @@ module "dynamodb" {
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="billing_mode"></a> [billing_mode](#input\_billing_mode_) | If true, a global cluster will be created. | `bool` | n/a | yes |
-| <a name="read_capacity"></a> [read_capacity](#input\_read_capacity_) | Cluster application name. | `string` | n/a | yes |
-| <a name="write_capacity"></a> [write_capacity](#input\_write_capacity_) | Name of the database engine to be used for this DB cluster. Valid Values: aurora-mysql, aurora-postgresql, mysql, postgres. (Note that mysql and postgres are Multi-AZ RDS clusters). | `string` | n/a | yes |
+| <a name="billing_mode"></a> [billing_mode](#input\_billing_mode_) | If true, a global cluster will be created. | `string` | n/a | yes |
+| <a name="read_capacity"></a> [read_capacity](#input\_read_capacity_) | Cluster application name. | `number` | n/a | yes |
+| <a name="write_capacity"></a> [write_capacity](#input\_write_capacity_) | Name of the database engine to be used for this DB cluster. Valid Values: aurora-mysql, aurora-postgresql, mysql, postgres. (Note that mysql and postgres are Multi-AZ RDS clusters). | `number` | n/a | yes |
 | <a name="hash_key"></a> [hash_key](#input\_hash_key_) | Database engine version. | `string` | n/a | yes |
 | <a name="range_key"></a> [range_key](#input\_range_key_) | Data base name | `string` | n/a | yes |
-| <a name="point_in_time_recovery"></a> [point_in_time_recovery](#input\_point_in_time_recovery_) | If the DB cluster should have deletion protection enabled. The database can't be deleted when this value is set to true. The default is false. | `bool` | n/a | yes |
+| <a name="point_in_time_recovery"></a> [point_in_time_recovery](#input\_point_in_time_recovery_) | If the DB cluster should have deletion protection enabled. The database can't be deleted when this value is set to true. The default is false. | `string` | n/a | yes |
 | <a name="deletion_protection_enabled"></a> [deletion_protection_enabled](#input\_deletion_protection_enabled_) | If true, it'll be deploy only one node. | `bool` | n/a | yes |
 | <a name="name"></a> [name](#input\_name_) | Database engine mode. Valid values: global (only valid for Aurora MySQL 1.21 and earlier), parallelquery, provisioned, serverless. Defaults to: provisioned. See the RDS User Guide for limitations when using serverless. | `string` | n/a | yes |
-| <a name="type"></a> [type](#input\_type_) | Set to true to allow RDS to manage the master user password in Secrets Manager. Cannot be set if master_password is provided. | `bool` | n/a | yes |
-| <a name="enabled"></a> [enabled](#input\_enabled_) | (Required unless manage_master_user_password is set to true or unless a snapshot_identifier or replication_source_identifier is provided or unless a global_cluster_identifier is provided when the cluster is the "secondary" cluster of a global database) Password for the master DB user. Note that this may show up in logs, and it will be stored in the state file. Please refer to the RDS Naming Constraints. Cannot be set if manage_master_user_password is set to true. | `string` | n/a | no |
+| <a name="type"></a> [type](#input\_type_) | Set to true to allow RDS to manage the master user password in Secrets Manager. Cannot be set if master_password is provided. | `string` | n/a | yes |
+| <a name="enabled"></a> [enabled](#input\_enabled_) | (Required unless manage_master_user_password is set to true or unless a snapshot_identifier or replication_source_identifier is provided or unless a global_cluster_identifier is provided when the cluster is the "secondary" cluster of a global database) Password for the master DB user. Note that this may show up in logs, and it will be stored in the state file. Please refer to the RDS Naming Constraints. Cannot be set if manage_master_user_password is set to true. | `bool` | n/a | no |
 | <a name="kms_key_arn"></a> [kms_key_arn](#input\_kms_key_arn_) | Master username for the database | `string` | n/a | yes |
-| <a name="propagate_tags"></a> [propagate_tags](#input\_propagate_tags_) | Days to retain backups for. Default 1. | `number` | n/a | yes |
-| <a name="functionality"></a> [functionality](#input\_functionality_) | Determines whether a final DB snapshot is created before the DB cluster is deleted. If true is specified, no DB snapshot is created. If false is specified, a DB snapshot is created before the DB cluster is deleted, using the value from final_snapshot_identifier. Default is false. | `bool` | n/a | yes |
+| <a name="propagate_tags"></a> [propagate_tags](#input\_propagate_tags_) | Days to retain backups for. Default 1. | `string` | n/a | yes |
+| <a name="functionality"></a> [functionality](#input\_functionality_) | Determines whether a final DB snapshot is created before the DB cluster is deleted. If true is specified, no DB snapshot is created. If false is specified, a DB snapshot is created before the DB cluster is deleted, using the value from final_snapshot_identifier. Default is false. | `string` | n/a | yes |
 
 ## References (PENDIENTE)
