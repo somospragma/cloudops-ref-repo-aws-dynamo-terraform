@@ -96,7 +96,7 @@ module "kms" {
   }
 
   # Dynamo configuration 
-  dynamo_config" [
+  dynamo_config [
     {
         billing_mode   = "xxxxxx"
         read_capacity  = "xxxxxx"
