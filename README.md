@@ -59,7 +59,7 @@ provider "aws" {
 }
 
 sample/dynamodb/main.tf
-module "vpc" {
+module "dynamodb" {
   source = ""
   providers = {
     aws.project = aws.alias01
@@ -71,7 +71,7 @@ module "vpc" {
 ## Uso del Módulo:
 
 ```hcl
-module "kms" {
+module "dynamodb" {
   source = ""
   
   providers = {
@@ -95,8 +95,8 @@ module "kms" {
     datatype      = "xxxxxx"
   }
 
-  # Dynamo configuration 
-  dynamo_config [
+  # Dynamodb configuration 
+  dynamodb_config [
     {
         billing_mode   = "xxxxxx"
         read_capacity  = "xxxxxx"
