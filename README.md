@@ -2,7 +2,7 @@
 
 ## Descripción:
 
-Este módulo permite la creación y gestión de tablas DynamoDB en AWS, facilitando la configuración de rendimiento, seguridad y alta disponibilidad.
+Este módulo permite la creación y gestión de tablas DynamoDB en AWS, facilitando la configuración de  rendimiento, seguridad y alta disponibilidad.
 
 DynamoDB
 - Crear una tabla DynamoDB con el esquema de clave primaria especificado.
