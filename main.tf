@@ -69,7 +69,7 @@ resource "aws_dynamodb_table" "dynamo_table" {
 
   # Protección contra destrucción accidental (PC-IAC-020)
   lifecycle {
-    prevent_destroy = true
+    prevent_destroy = each.value.prevent_destroy
   }
 }
 
