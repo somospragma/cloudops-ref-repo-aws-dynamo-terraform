@@ -7,6 +7,10 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Fixed
+- Corrección de error en outputs `table_stream_arns` y `table_stream_labels` cuando `stream_enabled` es null
+- Uso de validación explícita `v.stream_enabled != null && v.stream_enabled == true` en condiciones de outputs
+
 ## [1.0.0] - 2026-02-23
 
 ### Added
