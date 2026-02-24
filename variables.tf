@@ -70,7 +70,6 @@ variable "dynamo_config" {
     range_key                   = optional(string)
     point_in_time_recovery      = optional(bool, true)
     deletion_protection_enabled = optional(bool, true)
-    prevent_destroy             = optional(bool, true)
 
     attributes = list(object({
       name = string
