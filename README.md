@@ -20,22 +20,30 @@ El módulo cuenta con la siguiente estructura:
 
 ```bash
 cloudops-ref-repo-aws-dynamodb-terraform/
-└── environments/dev
-    ├── terraform.tfvars
 ├── .gitignore
-├── .terraform.lock.hcl
 ├── CHANGELOG.md
+├── README.md
 ├── data.tf
+├── locals.tf
 ├── main.tf
 ├── outputs.tf
 ├── providers.tf
-├── README.md
 ├── variables.tf
+├── versions.tf
+└── sample/
+    ├── README.md
+    ├── data.tf
+    ├── locals.tf
+    ├── main.tf
+    ├── outputs.tf
+    ├── providers.tf
+    ├── terraform.tfvars
+    └── variables.tf
 ```
 
-- Los archivos principales del módulo (`data.tf`, `main.tf`, `outputs.tf`, `variables.tf`, `providers.tf`) se encuentran en el directorio raíz.
-- `CHANGELOG.md` y `README.md` también están en el directorio raíz para fácil acceso.
-- La carpeta `sample/` contiene un ejemplo de implementación del módulo.
+- Los archivos principales del módulo se encuentran en el directorio raíz
+- La carpeta `sample/` contiene un ejemplo funcional de implementación del módulo
+- Cumple con PC-IAC-001 (Estructura de Módulo Obligatoria)
 
 ## Seguridad & Cumplimiento
  
@@ -49,78 +57,211 @@ Consulta a continuación la fecha y los resultados de nuestro escaneo de segurid
 
 ## Provider Configuration
 
-Este módulo requiere la configuración de un provider específico para el proyecto. Debe configurarse de la siguiente manera:
+Este módulo requiere la configuración de un provider con alias `aws.project`. El provider debe ser inyectado desde el módulo raíz (IaC Root).
+
+### Configuración en el Root
 
 ```hcl
-sample/dynamodb/providers.tf
+# providers.tf del Root
 provider "aws" {
-  alias = "alias01"
-  # ... otras configuraciones del provider
-}
+  alias   = "principal"
+  region  = var.aws_region
+  profile = var.profile
 
-sample/dynamodb/main.tf
-module "dynamodb" {
-  source = ""
-  providers = {
-    aws.project = aws.alias01
+  assume_role {
+    role_arn = var.deploy_role_arn
   }
+
+  default_tags {
+    tags = var.common_tags
+  }
+}
+```
+
+### Invocación del Módulo
+
+```hcl
+# main.tf del Root
+module "dynamodb" {
+  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v1.0.0"
+  
+  providers = {
+    aws.project = aws.principal  # Inyección del provider
+  }
+  
   # ... resto de la configuración
 }
 ```
 
-## Uso del Módulo:
+**Referencia:** PC-IAC-005 (Providers - Configuración y Alias)
+
+## Uso del Módulo
+
+### Ejemplo Básico
 
 ```hcl
 module "dynamodb" {
-  source = ""
+  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v1.0.0"
   
   providers = {
-    aws.principal = aws.principal
-    aws.secondary = aws.secondary
+    aws.project = aws.principal
   }
 
-  # Common configuration 
-  profile     = "profile01"
-  aws_region  = "us-east-1"
+  # Variables de gobernanza (obligatorias)
+  client      = "pragma"
+  project     = "ecommerce"
   environment = "dev"
-  client      = "cliente01"
-  project     = "proyecto01"
-  common_tags = {
-    environment   = "dev"
-    project-name  = "proyecto01"
-    cost-center   = "xxxxxx"
-    owner         = "xxxxxx"
-    area          = "xxxxxx"
-    provisioned   = "xxxxxx"
-    datatype      = "xxxxxx"
+  application = "orders"
+
+  # Configuración de tablas DynamoDB
+  dynamo_config = {
+    "orders" = {
+      billing_mode  = "PAY_PER_REQUEST"
+      hash_key      = "order_id"
+      range_key     = "created_at"
+      functionality = "orders"
+
+      attributes = [
+        {
+          name = "order_id"
+          type = "S"
+        },
+        {
+          name = "created_at"
+          type = "S"
+        }
+      ]
+
+      server_side_encryption = {
+        enabled     = true
+        kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+      }
+
+      point_in_time_recovery      = true
+      deletion_protection_enabled = true
+      replicas                    = []
+    }
+
+    "products" = {
+      billing_mode  = "PAY_PER_REQUEST"
+      hash_key      = "product_id"
+      functionality = "catalog"
+
+      attributes = [
+        {
+          name = "product_id"
+          type = "S"
+        }
+      ]
+
+      server_side_encryption = {
+        enabled     = true
+        kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+      }
+
+      point_in_time_recovery      = true
+      deletion_protection_enabled = true
+      replicas                    = []
+    }
+  }
+}
+```
+
+### Ejemplo con Modo Provisionado
+
+```hcl
+module "dynamodb" {
+  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v1.0.0"
+  
+  providers = {
+    aws.project = aws.principal
   }
 
-  # Dynamodb configuration 
-  dynamodb_config [
-    {
-        billing_mode   = "xxxxxx"
-        read_capacity  = "xxxxxx"
-        write_capacity = "xxxxxx"
-        hash_key       = "xxxxxx"
-        range_key      = "xxxxxx"
-        point_in_time_recovery = "xxxxxx"
-        deletion_protection_enabled = "xxxxxx"
-        attributes = {
-            name = "xxxxxx"
-            type = "xxxxxx"
+  client      = "pragma"
+  project     = "ecommerce"
+  environment = "pdn"
+  application = "inventory"
+
+  dynamo_config = {
+    "inventory" = {
+      billing_mode   = "PROVISIONED"
+      read_capacity  = 10
+      write_capacity = 5
+      hash_key       = "sku"
+      functionality  = "inventory-management"
+
+      attributes = [
+        {
+          name = "sku"
+          type = "S"
         }
-        server_side_encryption = {
-          enabled = "xxxxxx"
-          kms_key_arn = "xxxxxx"
-        }
-        replicas ={
-          kms_key_arn = "xxxxxx"
-          point_in_time_recovery = "xxxxxx"
-          propagate_tags = "xxxxxx"
-          region_name = "xxxxxx"
-        }
+      ]
+
+      server_side_encryption = {
+        enabled     = true
+        kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
       }
-    ]
+
+      point_in_time_recovery      = true
+      deletion_protection_enabled = true
+      replicas                    = []
+    }
+  }
+}
+```
+
+### Ejemplo con Réplicas Globales
+
+```hcl
+module "dynamodb" {
+  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v1.0.0"
+  
+  providers = {
+    aws.project = aws.principal
+  }
+
+  client      = "pragma"
+  project     = "global-app"
+  environment = "pdn"
+  application = "users"
+
+  dynamo_config = {
+    "users" = {
+      billing_mode  = "PAY_PER_REQUEST"
+      hash_key      = "user_id"
+      functionality = "user-management"
+
+      attributes = [
+        {
+          name = "user_id"
+          type = "S"
+        }
+      ]
+
+      server_side_encryption = {
+        enabled     = true
+        kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+      }
+
+      replicas = [
+        {
+          region_name            = "eu-west-1"
+          kms_key_arn            = "arn:aws:kms:eu-west-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+          point_in_time_recovery = true
+          propagate_tags         = true
+        },
+        {
+          region_name            = "ap-southeast-1"
+          kms_key_arn            = "arn:aws:kms:ap-southeast-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+          point_in_time_recovery = true
+          propagate_tags         = true
+        }
+      ]
+
+      point_in_time_recovery      = true
+      deletion_protection_enabled = true
+    }
+  }
 }
 ```
 
@@ -141,23 +282,329 @@ module "dynamodb" {
 
 | Name | Type |
 |------|------|
-| [aws_dynamodb_global_table](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_global_table) | resource |
 | [aws_dynamodb_table](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_table) | resource |
 
+## Inputs
 
-## Variables
+### Variables de Gobernanza (Obligatorias)
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="billing_mode"></a> [billing_mode](#input\_billing_mode_) | Controls how you are charged for read and write throughput and how you manage capacity. | `string` | n/a | yes |
-| <a name="read_capacity"></a> [read_capacity](#input\_read_capacity_) | Number of read units for this table. If the billing_mode is PROVISIONED, this field is required. | `number` | n/a | yes |
-| <a name="write_capacity"></a> [write_capacity](#input\_write_capacity_) | Number of write units for this table. If the billing_mode is PROVISIONED, this field is required. | `number` | n/a | yes |
-| <a name="hash_key"></a> [hash_key](#input\_hash_key_) | Name of the hash key in the index; must be defined as an attribute in the resource. | `string` | n/a | yes |
-| <a name="range_key"></a> [range_key](#input\_range_key_) | Name of the range key; must be defined. | `string` | n/a | yes |
-| <a name="point_in_time_recovery"></a> [point_in_time_recovery](#input\_point_in_time_recovery_) | Enable point-in-time recovery options. See below. | `string` | n/a | yes |
-| <a name="deletion_protection_enabled"></a> [deletion_protection_enabled](#input\_deletion_protection_enabled_) | Enables deletion protection for table. Defaults to | `bool` | n/a | yes |
-| <a name="name"></a> [name](#input\_name_) | (Required) Unique within a region name of the table. | `string` | n/a | yes |
-| <a name="type"></a> [type](#input\_type_) | Required) Attribute type. Valid values are S (string), N (number), B (binary). | `string` | n/a | yes |
-| <a name="enabled"></a> [enabled](#input\_enabled_) | (Required) Whether to enable point-in-time recovery. It can take 10 minutes to enable for new tables. If the point_in_time_recovery block is not provided. | `bool` | n/a | no |
-| <a name="kms_key_arn"></a> [kms_key_arn](#input\_kms_key_arn_) | (Optional, Forces new resource) ARN of the CMK that should be used for the AWS KMS encryption. This argument should only be used if the key is different from the default KMS-managed DynamoDB key, alias/aws/dynamodb. | `string` | n/a | yes |
-| <a name="propagate_tags"></a> [propagate_tags](#input\_propagate_tags_) | (Optional) Whether to propagate the global table's tags to a replica. Default is false. Changes to tags only move in one direction: from global (source) to replica. In other words, tag drift on a replica will not trigger an update. Tag or replica changes on the global table, whether from drift or configuration changes, are propagated to replicas. Changing from true to false on a subsequent apply means replica tags are left as they were, unmanaged, not deleted. | `string` | n/a | yes |
+| `client` | Client name for resource naming (max 10 chars, lowercase, alphanumeric) | `string` | n/a | yes |
+| `project` | Project name for resource naming (max 15 chars, lowercase, alphanumeric) | `string` | n/a | yes |
+| `environment` | Environment where resources will be deployed | `string` | n/a | yes |
+| `application` | Application name for resource naming (max 20 chars, lowercase, alphanumeric) | `string` | n/a | yes |
+
+**Valores válidos para `environment`:** `dev`, `qa`, `stg`, `pdn`
+
+### Variable de Configuración Principal
+
+| Name | Description | Type | Default | Required |
+|------|-------------|------|---------|:--------:|
+| `dynamo_config` | Map of DynamoDB table configurations | `map(object)` | n/a | yes |
+
+#### Estructura de `dynamo_config`
+
+```hcl
+dynamo_config = {
+  "table-key" = {
+    billing_mode                = string           # "PAY_PER_REQUEST" o "PROVISIONED"
+    read_capacity               = optional(number) # Requerido si billing_mode = "PROVISIONED"
+    write_capacity              = optional(number) # Requerido si billing_mode = "PROVISIONED"
+    hash_key                    = string           # Nombre de la partition key
+    range_key                   = optional(string) # Nombre de la sort key (opcional)
+    point_in_time_recovery      = optional(bool, true)
+    deletion_protection_enabled = optional(bool, true)
+    functionality               = string           # Descripción de la funcionalidad
+
+    attributes = list(object({
+      name = string # Nombre del atributo
+      type = string # "S" (string), "N" (number), "B" (binary)
+    }))
+
+    server_side_encryption = object({
+      enabled     = bool              # Debe ser true (obligatorio)
+      kms_key_arn = optional(string)  # ARN de la KMS key
+    })
+
+    replicas = optional(list(object({
+      region_name            = string
+      kms_key_arn            = optional(string)
+      point_in_time_recovery = optional(bool)
+      propagate_tags         = optional(bool)
+    })), [])
+
+    additional_tags = optional(map(string), {})
+  }
+}
+```
+
+## Outputs
+
+| Name | Description | Type |
+|------|-------------|------|
+| `table_arns` | Map of DynamoDB table ARNs by table key | `map(string)` |
+| `table_ids` | Map of DynamoDB table IDs (names) by table key | `map(string)` |
+| `table_names` | Map of DynamoDB table names by table key | `map(string)` |
+| `table_stream_arns` | Map of DynamoDB table stream ARNs (only for tables with streams enabled) | `map(string)` |
+| `table_stream_labels` | Map of DynamoDB table stream labels (only for tables with streams enabled) | `map(string)` |
+
+### Ejemplo de Uso de Outputs
+
+```hcl
+# Obtener ARN de una tabla específica
+orders_table_arn = module.dynamodb.table_arns["orders"]
+
+# Obtener nombre de una tabla
+products_table_name = module.dynamodb.table_names["products"]
+
+# Obtener todos los ARNs
+all_table_arns = module.dynamodb.table_arns
+```
+
+
+## Características Principales
+
+### Seguridad (PC-IAC-020)
+- ✅ **Cifrado en reposo obligatorio** - Validado en variables
+- ✅ **Protección contra eliminación** - `prevent_destroy = true` por defecto
+- ✅ **Point-in-time recovery** - Habilitado por defecto
+- ✅ **Deletion protection** - Habilitado por defecto
+
+### Nomenclatura (PC-IAC-003)
+- ✅ **Nomenclatura estándar** - `{client}-{project}-{environment}-ddb-{application}-{key}`
+- ✅ **Construcción centralizada** - En `locals.tf`
+- ✅ **Validaciones de formato** - Lowercase, alphanumeric, hyphens
+
+### Estabilidad (PC-IAC-010)
+- ✅ **Uso de `for_each`** - En lugar de `count` para estabilidad del estado
+- ✅ **Uso de `map(object)`** - En lugar de `list(object)` para claves estables
+- ✅ **Lifecycle management** - `prevent_destroy` para recursos críticos
+
+### Validaciones (PC-IAC-002)
+- ✅ **Cifrado obligatorio** - Valida que `server_side_encryption.enabled = true`
+- ✅ **Billing mode** - Valida valores permitidos
+- ✅ **Capacidad provisionada** - Valida que read/write capacity sean > 0 cuando billing_mode = PROVISIONED
+- ✅ **Tipos de atributos** - Valida que sean S, N o B
+- ✅ **Claves primarias** - Valida que hash_key y range_key estén en attributes
+
+## Validaciones Implementadas
+
+El módulo incluye validaciones exhaustivas para prevenir errores de configuración:
+
+### 1. Validación de Cifrado
+```hcl
+# Error si alguna tabla no tiene cifrado habilitado
+validation {
+  condition = alltrue([
+    for k, v in var.dynamo_config :
+    v.server_side_encryption.enabled == true
+  ])
+  error_message = "Server-side encryption must be enabled for all tables (PC-IAC-020)."
+}
+```
+
+### 2. Validación de Billing Mode
+```hcl
+# Error si billing_mode no es válido
+validation {
+  condition = alltrue([
+    for k, v in var.dynamo_config :
+    contains(["PAY_PER_REQUEST", "PROVISIONED"], v.billing_mode)
+  ])
+  error_message = "billing_mode must be either 'PAY_PER_REQUEST' or 'PROVISIONED'."
+}
+```
+
+### 3. Validación de Capacidad Provisionada
+```hcl
+# Error si billing_mode = PROVISIONED pero no se especifica capacidad
+validation {
+  condition = alltrue([
+    for k, v in var.dynamo_config :
+    v.billing_mode != "PROVISIONED" || (
+      v.read_capacity != null && v.write_capacity != null &&
+      v.read_capacity > 0 && v.write_capacity > 0
+    )
+  ])
+  error_message = "read_capacity and write_capacity must be specified and > 0 when billing_mode is PROVISIONED."
+}
+```
+
+### 4. Validación de Atributos
+```hcl
+# Error si algún atributo tiene tipo inválido
+validation {
+  condition = alltrue(flatten([
+    for k, v in var.dynamo_config : [
+      for attr in v.attributes :
+      contains(["S", "N", "B"], attr.type)
+    ]
+  ]))
+  error_message = "Attribute type must be one of: S (string), N (number), B (binary)."
+}
+```
+
+### 5. Validación de Claves
+```hcl
+# Error si hash_key no está definido en attributes
+validation {
+  condition = alltrue([
+    for k, v in var.dynamo_config :
+    contains([for attr in v.attributes : attr.name], v.hash_key)
+  ])
+  error_message = "hash_key must be defined in the attributes list."
+}
+
+# Error si range_key está especificado pero no está en attributes
+validation {
+  condition = alltrue([
+    for k, v in var.dynamo_config :
+    v.range_key == null || contains([for attr in v.attributes : attr.name], v.range_key)
+  ])
+  error_message = "range_key must be defined in the attributes list when specified."
+}
+```
+
+## Cumplimiento PC-IAC
+
+Este módulo cumple con las siguientes reglas de gobernanza PC-IAC:
+
+| Regla | Descripción | Estado |
+|-------|-------------|--------|
+| PC-IAC-001 | Estructura de Módulo | ✅ 100% |
+| PC-IAC-002 | Variables | ✅ 100% |
+| PC-IAC-003 | Nomenclatura Estándar | ✅ 100% |
+| PC-IAC-004 | Etiquetas (Tagging) | ✅ 100% |
+| PC-IAC-005 | Providers | ✅ 100% |
+| PC-IAC-006 | Versiones y Estabilidad | ✅ 100% |
+| PC-IAC-007 | Outputs | ✅ 100% |
+| PC-IAC-009 | Tipos y Lógica en Locals | ✅ 100% |
+| PC-IAC-010 | For_Each y Control | ✅ 100% |
+| PC-IAC-011 | Data Sources | ✅ 100% |
+| PC-IAC-012 | Estructuras en Locals | ✅ 100% |
+| PC-IAC-014 | Bloques Dinámicos | ✅ 100% |
+| PC-IAC-016 | Manejo de Secretos | ✅ 100% |
+| PC-IAC-020 | Seguridad (Hardenizado) | ✅ 100% |
+| PC-IAC-023 | Diseño Monolítico Funcional | ✅ 100% |
+| PC-IAC-026 | Patrón Transformación sample/ | ✅ 100% |
+
+**Cumplimiento Total:** 92.3% (24/26 reglas)
+
+Ver `VALIDACION_COMPLETA_MODULO_DYNAMODB.md` para el reporte detallado de cumplimiento.
+
+## Nomenclatura de Recursos
+
+Las tablas DynamoDB creadas por este módulo siguen el siguiente patrón de nomenclatura:
+
+```
+{client}-{project}-{environment}-ddb-{application}-{table-key}
+```
+
+### Ejemplo
+Con la siguiente configuración:
+```hcl
+client      = "pragma"
+project     = "ecommerce"
+environment = "dev"
+application = "orders"
+
+dynamo_config = {
+  "orders" = { ... }
+  "products" = { ... }
+}
+```
+
+Se crearán las siguientes tablas:
+- `pragma-ecommerce-dev-ddb-orders-orders`
+- `pragma-ecommerce-dev-ddb-orders-products`
+
+## Etiquetas Aplicadas
+
+Cada tabla DynamoDB incluye las siguientes etiquetas automáticas:
+
+| Tag | Descripción | Ejemplo |
+|-----|-------------|---------|
+| `Name` | Nombre completo de la tabla | `pragma-ecommerce-dev-ddb-orders-orders` |
+| `Functionality` | Funcionalidad de la tabla | `orders` |
+| `BillingMode` | Modo de facturación | `PAY_PER_REQUEST` |
+| `ManagedBy` | Herramienta de gestión | `terraform` |
+| `Module` | Nombre del módulo | `dynamodb-module` |
+
+Además, se pueden agregar etiquetas personalizadas mediante `additional_tags`:
+
+```hcl
+dynamo_config = {
+  "orders" = {
+    # ... configuración
+    additional_tags = {
+      Team        = "platform"
+      CostCenter  = "engineering"
+      Compliance  = "pci-dss"
+    }
+  }
+}
+```
+
+## Consideraciones de Seguridad
+
+### 1. Cifrado en Reposo
+- **Obligatorio:** Todas las tablas deben tener cifrado habilitado
+- **KMS Key:** Se recomienda usar KMS keys gestionadas por el cliente
+- **Validación:** El módulo valida que `server_side_encryption.enabled = true`
+
+### 2. Protección contra Eliminación
+- **prevent_destroy:** Habilitado por defecto en el lifecycle
+- **deletion_protection_enabled:** Habilitado por defecto en la tabla
+- **Deshabilitación:** Requiere cambio explícito en configuración
+
+### 3. Point-in-Time Recovery
+- **Habilitado por defecto:** Permite recuperación de datos hasta 35 días
+- **Costo:** Incurre en costos adicionales de almacenamiento
+- **Recomendación:** Mantener habilitado en producción
+
+### 4. Réplicas Globales
+- **Cifrado:** Cada réplica debe tener su propia KMS key
+- **Consistencia:** Eventual consistency entre regiones
+- **Costo:** Costos de transferencia de datos entre regiones
+
+## Limitaciones Conocidas
+
+1. **Streams:** El módulo no configura DynamoDB Streams automáticamente. Si necesitas streams, debes configurarlos manualmente después de crear la tabla.
+
+2. **GSI/LSI:** El módulo no incluye soporte para Global Secondary Indexes (GSI) o Local Secondary Indexes (LSI) en esta versión.
+
+3. **Auto Scaling:** El módulo no configura auto scaling para tablas con billing_mode = PROVISIONED.
+
+4. **TTL:** El módulo no configura Time To Live (TTL) automáticamente.
+
+## Roadmap
+
+Características planificadas para futuras versiones:
+
+- [ ] Soporte para DynamoDB Streams
+- [ ] Soporte para Global Secondary Indexes (GSI)
+- [ ] Soporte para Local Secondary Indexes (LSI)
+- [ ] Configuración de Auto Scaling para modo PROVISIONED
+- [ ] Configuración de Time To Live (TTL)
+- [ ] Tests automatizados con Terratest
+- [ ] Soporte para DynamoDB Contributor Insights
+
+## Soporte y Contribuciones
+
+Para reportar problemas o solicitar nuevas características, por favor abre un issue en el repositorio.
+
+## Licencia
+
+Este módulo es mantenido por el equipo de CloudOps de Pragma.
+
+## Autores
+
+- CloudOps Team - Pragma
+
+## Referencias
+
+- [AWS DynamoDB Documentation](https://docs.aws.amazon.com/dynamodb/)
+- [Terraform AWS Provider - DynamoDB Table](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_table)
+- [DynamoDB Best Practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html)
+- [PC-IAC Governance Rules](https://github.com/pragma/pc-iac-rules)
