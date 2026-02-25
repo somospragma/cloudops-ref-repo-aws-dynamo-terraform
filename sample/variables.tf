@@ -94,6 +94,47 @@ variable "dynamo_config" {
       region_name            = string
     })), [])
 
+    stream_enabled   = optional(bool, false)
+    stream_view_type = optional(string, "NEW_AND_OLD_IMAGES")
+
+    ttl_enabled        = optional(bool, false)
+    ttl_attribute_name = optional(string, "")
+
+    global_secondary_indexes = optional(list(object({
+      name = string
+      key_schema = list(object({
+        attribute_name = string
+        key_type       = string # "HASH" or "RANGE"
+      }))
+      projection_type    = string
+      non_key_attributes = optional(list(string), [])
+      read_capacity      = optional(number)
+      write_capacity     = optional(number)
+    })), [])
+
+    local_secondary_indexes = optional(list(object({
+      name               = string
+      range_key          = string
+      projection_type    = string
+      non_key_attributes = optional(list(string), [])
+    })), [])
+
+    autoscaling_enabled = optional(bool, false)
+    autoscaling_read = optional(object({
+      min_capacity       = number
+      max_capacity       = number
+      target_utilization = optional(number, 70)
+      scale_in_cooldown  = optional(number, 60)
+      scale_out_cooldown = optional(number, 60)
+    }))
+    autoscaling_write = optional(object({
+      min_capacity       = number
+      max_capacity       = number
+      target_utilization = optional(number, 70)
+      scale_in_cooldown  = optional(number, 60)
+      scale_out_cooldown = optional(number, 60)
+    }))
+
     functionality = string
   }))
 }

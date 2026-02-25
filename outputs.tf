@@ -35,3 +35,36 @@ output "table_stream_labels" {
   }
 }
 
+output "table_gsi_names" {
+  description = "Map of Global Secondary Index names by table key"
+  value = {
+    for k, v in var.dynamo_config :
+    k => [for gsi in v.global_secondary_indexes : gsi.name]
+    if length(v.global_secondary_indexes) > 0
+  }
+}
+
+output "table_lsi_names" {
+  description = "Map of Local Secondary Index names by table key"
+  value = {
+    for k, v in var.dynamo_config :
+    k => [for lsi in v.local_secondary_indexes : lsi.name]
+    if length(v.local_secondary_indexes) > 0
+  }
+}
+
+output "autoscaling_read_policy_arns" {
+  description = "Map of Auto Scaling read policy ARNs by table key"
+  value = {
+    for k, v in aws_appautoscaling_policy.dynamodb_table_read_policy :
+    k => v.arn
+  }
+}
+
+output "autoscaling_write_policy_arns" {
+  description = "Map of Auto Scaling write policy ARNs by table key"
+  value = {
+    for k, v in aws_appautoscaling_policy.dynamodb_table_write_policy :
+    k => v.arn
+  }
+}
