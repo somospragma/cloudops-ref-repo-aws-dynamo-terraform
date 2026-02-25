@@ -265,6 +265,67 @@ module "dynamodb" {
 }
 ```
 
+### Ejemplo con DynamoDB Streams
+
+```hcl
+module "dynamodb" {
+  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v1.0.0"
+  
+  providers = {
+    aws.project = aws.principal
+  }
+
+  client      = "pragma"
+  project     = "events"
+  environment = "pdn"
+  application = "audit"
+
+  dynamo_config = {
+    "audit-log" = {
+      billing_mode  = "PAY_PER_REQUEST"
+      hash_key      = "event_id"
+      range_key     = "timestamp"
+      functionality = "audit-logging"
+
+      # Habilitar DynamoDB Streams para capturar cambios
+      stream_enabled   = true
+      stream_view_type = "NEW_AND_OLD_IMAGES"  # Captura estado completo antes y después
+
+      attributes = [
+        {
+          name = "event_id"
+          type = "S"
+        },
+        {
+          name = "timestamp"
+          type = "N"
+        }
+      ]
+
+      server_side_encryption = {
+        enabled     = true
+        kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+      }
+
+      point_in_time_recovery      = true
+      deletion_protection_enabled = true
+      replicas                    = []
+    }
+  }
+}
+
+# Usar el stream ARN para conectar con Lambda, Kinesis, etc.
+output "audit_stream_arn" {
+  value = module.dynamodb.table_stream_arns["audit-log"]
+}
+```
+
+**Valores válidos para `stream_view_type`:**
+- `KEYS_ONLY` - Solo las claves de los items modificados
+- `NEW_IMAGE` - El item completo después de la modificación
+- `OLD_IMAGE` - El item completo antes de la modificación
+- `NEW_AND_OLD_IMAGES` - El item completo antes y después (recomendado)
+
 ## Requirements
 
 | Name | Version |
@@ -333,6 +394,10 @@ dynamo_config = {
       point_in_time_recovery = optional(bool)
       propagate_tags         = optional(bool)
     })), [])
+
+    # DynamoDB Streams (opcional)
+    stream_enabled   = optional(bool, false)                    # Habilitar streams
+    stream_view_type = optional(string, "NEW_AND_OLD_IMAGES")  # Tipo de vista del stream
 
     additional_tags = optional(map(string), {})
   }
@@ -570,7 +635,7 @@ dynamo_config = {
 
 ## Limitaciones Conocidas
 
-1. **Streams:** El módulo no configura DynamoDB Streams automáticamente. Si necesitas streams, debes configurarlos manualmente después de crear la tabla.
+1. **prevent_destroy no configurable:** Debido a limitaciones de Terraform, `prevent_destroy` en el bloque `lifecycle` debe ser un valor literal y no puede ser configurado dinámicamente por variable. Está siempre habilitado (`true`) para proteger las tablas. Para deshabilitar, se debe modificar manualmente el código del módulo.
 
 2. **GSI/LSI:** El módulo no incluye soporte para Global Secondary Indexes (GSI) o Local Secondary Indexes (LSI) en esta versión.
 
@@ -582,7 +647,7 @@ dynamo_config = {
 
 Características planificadas para futuras versiones:
 
-- [ ] Soporte para DynamoDB Streams
+- [x] Soporte para DynamoDB Streams ✅ (Implementado)
 - [ ] Soporte para Global Secondary Indexes (GSI)
 - [ ] Soporte para Local Secondary Indexes (LSI)
 - [ ] Configuración de Auto Scaling para modo PROVISIONED
