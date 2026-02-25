@@ -163,8 +163,8 @@ variable "dynamo_config" {
     condition = alltrue([
       for k, v in var.dynamo_config :
       v.billing_mode != "PROVISIONED" || (
-        v.read_capacity != null && v.write_capacity != null &&
-        v.read_capacity > 0 && v.write_capacity > 0
+        v.read_capacity != null && v.read_capacity > 0 &&
+        v.write_capacity != null && v.write_capacity > 0
       )
     ])
     error_message = "read_capacity and write_capacity must be specified and > 0 when billing_mode is PROVISIONED."
@@ -270,7 +270,10 @@ variable "dynamo_config" {
     condition = alltrue(flatten([
       for k, v in var.dynamo_config : [
         for gsi in v.global_secondary_indexes :
-        v.billing_mode != "PROVISIONED" || (gsi.read_capacity != null && gsi.write_capacity != null && gsi.read_capacity > 0 && gsi.write_capacity > 0)
+        v.billing_mode != "PROVISIONED" || (
+          gsi.read_capacity != null && gsi.read_capacity > 0 &&
+          gsi.write_capacity != null && gsi.write_capacity > 0
+        )
       ]
     ]))
     error_message = "GSI read_capacity and write_capacity must be specified and > 0 when table billing_mode is PROVISIONED."
