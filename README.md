@@ -1,19 +1,29 @@
 # **Módulo Terraform: cloudops-ref-repo-aws-dynamo-terraform**
 
-## Descripción:
+**Versión:** 2.0.0  
+**Última Actualización:** 24 de febrero de 2026
 
-Este módulo permite la creación y gestión de tablas DynamoDB en AWS, facilitando la configuración de  rendimiento, seguridad y alta disponibilidad.
+## Descripción
 
-DynamoDB
-- Crear una tabla DynamoDB con el esquema de clave primaria especificado.
-- Configurar el modo de capacidad (on-demand o provisionado).
-- Habilitar el cifrado en reposo mediante KMS.
-- Configurar las políticas de acceso para la tabla.
-- Habilitar backups automáticos y exportaciones.
-- Configurar replicación global para alta disponibilidad y recuperación ante desastres.
+Este módulo permite la creación y gestión completa de tablas DynamoDB en AWS, facilitando la configuración de rendimiento, seguridad, alta disponibilidad y características avanzadas.
 
+### Características Principales
 
-Consulta CHANGELOG.md para la lista de cambios de cada versión. *Recomendamos encarecidamente que en tu código fijes la versión exacta que estás utilizando para que tu infraestructura permanezca estable y actualices las versiones de manera sistemática para evitar sorpresas.*
+**DynamoDB Core:**
+- ✅ Crear tablas DynamoDB con esquema de clave primaria configurable
+- ✅ Configurar modo de capacidad (on-demand o provisionado)
+- ✅ Cifrado en reposo obligatorio mediante KMS
+- ✅ Backups automáticos con Point-in-Time Recovery
+- ✅ Replicación global para alta disponibilidad
+
+**Características Avanzadas:**
+- ✅ **Global Secondary Indexes (GSI)** - Índices secundarios globales con Multi-Attribute Keys
+- ✅ **Local Secondary Indexes (LSI)** - Índices secundarios locales
+- ✅ **Auto Scaling** - Escalado automático para tablas PROVISIONED
+- ✅ **DynamoDB Streams** - Captura de cambios en tiempo real
+- ✅ **Time To Live (TTL)** - Eliminación automática de items expirados
+
+Consulta `CHANGELOG.md` para la lista completa de cambios de cada versión. *Recomendamos encarecidamente que en tu código fijes la versión exacta que estás utilizando para que tu infraestructura permanezca estable y actualices las versiones de manera sistemática para evitar sorpresas.*
 
 ## Estructura del Módulo
 El módulo cuenta con la siguiente estructura:
@@ -101,7 +111,7 @@ module "dynamodb" {
 
 ```hcl
 module "dynamodb" {
-  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v1.0.0"
+  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v2.0.0"
   
   providers = {
     aws.project = aws.principal
@@ -141,16 +151,61 @@ module "dynamodb" {
       deletion_protection_enabled = true
       replicas                    = []
     }
+  }
+}
+```
 
+### Ejemplo con Global Secondary Indexes (GSI)
+
+```hcl
+module "dynamodb" {
+  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v2.0.0"
+  
+  providers = {
+    aws.project = aws.principal
+  }
+
+  client      = "pragma"
+  project     = "ecommerce"
+  environment = "pdn"
+  application = "catalog"
+
+  dynamo_config = {
     "products" = {
       billing_mode  = "PAY_PER_REQUEST"
       hash_key      = "product_id"
-      functionality = "catalog"
+      functionality = "product-catalog"
 
       attributes = [
         {
           name = "product_id"
           type = "S"
+        },
+        {
+          name = "category"
+          type = "S"
+        },
+        {
+          name = "price"
+          type = "N"
+        }
+      ]
+
+      # Global Secondary Index para búsqueda por categoría y precio
+      global_secondary_indexes = [
+        {
+          name = "category-price-index"
+          key_schema = [
+            {
+              attribute_name = "category"
+              key_type       = "HASH"
+            },
+            {
+              attribute_name = "price"
+              key_type       = "RANGE"
+            }
+          ]
+          projection_type = "ALL"
         }
       ]
 
@@ -161,17 +216,16 @@ module "dynamodb" {
 
       point_in_time_recovery      = true
       deletion_protection_enabled = true
-      replicas                    = []
     }
   }
 }
 ```
 
-### Ejemplo con Modo Provisionado
+### Ejemplo con Local Secondary Indexes (LSI) y Auto Scaling
 
 ```hcl
 module "dynamodb" {
-  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v1.0.0"
+  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v2.0.0"
   
   providers = {
     aws.project = aws.principal
@@ -185,17 +239,69 @@ module "dynamodb" {
   dynamo_config = {
     "inventory" = {
       billing_mode   = "PROVISIONED"
-      read_capacity  = 10
+      read_capacity  = 5
       write_capacity = 5
-      hash_key       = "sku"
+      hash_key       = "warehouse_id"
+      range_key      = "sku"
       functionality  = "inventory-management"
 
       attributes = [
         {
+          name = "warehouse_id"
+          type = "S"
+        },
+        {
           name = "sku"
           type = "S"
+        },
+        {
+          name = "last_updated"
+          type = "N"
         }
       ]
+
+      # Local Secondary Index para ordenamiento alternativo
+      local_secondary_indexes = [
+        {
+          name            = "last-updated-index"
+          range_key       = "last_updated"
+          projection_type = "KEYS_ONLY"
+        }
+      ]
+
+      # Global Secondary Index para búsqueda por SKU
+      global_secondary_indexes = [
+        {
+          name = "sku-index"
+          key_schema = [
+            {
+              attribute_name = "sku"
+              key_type       = "HASH"
+            }
+          ]
+          projection_type    = "INCLUDE"
+          non_key_attributes = ["quantity", "location"]
+          read_capacity      = 5
+          write_capacity     = 5
+        }
+      ]
+
+      # Auto Scaling para capacidad provisionada
+      autoscaling_enabled = true
+      autoscaling_read = {
+        min_capacity       = 5
+        max_capacity       = 100
+        target_utilization = 70
+        scale_in_cooldown  = 60
+        scale_out_cooldown = 60
+      }
+      autoscaling_write = {
+        min_capacity       = 5
+        max_capacity       = 100
+        target_utilization = 70
+        scale_in_cooldown  = 60
+        scale_out_cooldown = 60
+      }
 
       server_side_encryption = {
         enabled     = true
@@ -204,7 +310,6 @@ module "dynamodb" {
 
       point_in_time_recovery      = true
       deletion_protection_enabled = true
-      replicas                    = []
     }
   }
 }
@@ -265,11 +370,11 @@ module "dynamodb" {
 }
 ```
 
-### Ejemplo con DynamoDB Streams
+### Ejemplo con DynamoDB Streams y TTL
 
 ```hcl
 module "dynamodb" {
-  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v1.0.0"
+  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v2.0.0"
   
   providers = {
     aws.project = aws.principal
@@ -290,6 +395,10 @@ module "dynamodb" {
       # Habilitar DynamoDB Streams para capturar cambios
       stream_enabled   = true
       stream_view_type = "NEW_AND_OLD_IMAGES"  # Captura estado completo antes y después
+
+      # Time To Live para eliminación automática de logs antiguos
+      ttl_enabled        = true
+      ttl_attribute_name = "expiration_time"  # Timestamp Unix en segundos
 
       attributes = [
         {
@@ -369,25 +478,35 @@ output "audit_stream_arn" {
 ```hcl
 dynamo_config = {
   "table-key" = {
+    # Configuración de capacidad
     billing_mode                = string           # "PAY_PER_REQUEST" o "PROVISIONED"
     read_capacity               = optional(number) # Requerido si billing_mode = "PROVISIONED"
     write_capacity              = optional(number) # Requerido si billing_mode = "PROVISIONED"
+    
+    # Claves primarias
     hash_key                    = string           # Nombre de la partition key
     range_key                   = optional(string) # Nombre de la sort key (opcional)
+    
+    # Protección y recuperación
     point_in_time_recovery      = optional(bool, true)
     deletion_protection_enabled = optional(bool, true)
+    
+    # Descripción
     functionality               = string           # Descripción de la funcionalidad
 
+    # Definición de atributos (solo para keys y índices)
     attributes = list(object({
       name = string # Nombre del atributo
       type = string # "S" (string), "N" (number), "B" (binary)
     }))
 
+    # Cifrado (obligatorio)
     server_side_encryption = object({
       enabled     = bool              # Debe ser true (obligatorio)
       kms_key_arn = optional(string)  # ARN de la KMS key
     })
 
+    # Réplicas globales (opcional)
     replicas = optional(list(object({
       region_name            = string
       kms_key_arn            = optional(string)
@@ -399,10 +518,96 @@ dynamo_config = {
     stream_enabled   = optional(bool, false)                    # Habilitar streams
     stream_view_type = optional(string, "NEW_AND_OLD_IMAGES")  # Tipo de vista del stream
 
+    # Time To Live (opcional)
+    ttl_enabled        = optional(bool, false)  # Habilitar TTL
+    ttl_attribute_name = optional(string, "")   # Nombre del atributo con timestamp
+
+    # Global Secondary Indexes (opcional)
+    global_secondary_indexes = optional(list(object({
+      name = string
+      key_schema = list(object({
+        attribute_name = string
+        key_type       = string # "HASH" or "RANGE"
+      }))
+      projection_type    = string                      # "ALL", "KEYS_ONLY", "INCLUDE"
+      non_key_attributes = optional(list(string), [])  # Requerido si projection_type = "INCLUDE"
+      read_capacity      = optional(number)            # Solo para PROVISIONED
+      write_capacity     = optional(number)            # Solo para PROVISIONED
+    })), [])
+
+    # Local Secondary Indexes (opcional)
+    local_secondary_indexes = optional(list(object({
+      name               = string
+      range_key          = string                      # Debe estar en attributes
+      projection_type    = string                      # "ALL", "KEYS_ONLY", "INCLUDE"
+      non_key_attributes = optional(list(string), [])  # Requerido si projection_type = "INCLUDE"
+    })), [])
+
+    # Auto Scaling (solo para PROVISIONED)
+    autoscaling_enabled = optional(bool, false)
+    autoscaling_read = optional(object({
+      min_capacity       = number
+      max_capacity       = number
+      target_utilization = optional(number, 70)
+      scale_in_cooldown  = optional(number, 60)
+      scale_out_cooldown = optional(number, 60)
+    }))
+    autoscaling_write = optional(object({
+      min_capacity       = number
+      max_capacity       = number
+      target_utilization = optional(number, 70)
+      scale_in_cooldown  = optional(number, 60)
+      scale_out_cooldown = optional(number, 60)
+    }))
+
+    # Etiquetas adicionales (opcional)
     additional_tags = optional(map(string), {})
   }
 }
 ```
+
+### Notas Importantes sobre GSI
+
+⚠️ **Cambio en v2.0.0:** Los Global Secondary Indexes ahora usan `key_schema` en lugar de `hash_key`/`range_key`.
+
+**ANTES (v1.x - Deprecado):**
+```hcl
+global_secondary_indexes = [
+  {
+    name            = "category-index"
+    hash_key        = "category"      # ❌ Deprecado
+    range_key       = "price"         # ❌ Deprecado
+    projection_type = "ALL"
+  }
+]
+```
+
+**AHORA (v2.0 - Recomendado):**
+```hcl
+global_secondary_indexes = [
+  {
+    name = "category-index"
+    key_schema = [                    # ✅ Nuevo patrón
+      {
+        attribute_name = "category"
+        key_type       = "HASH"
+      },
+      {
+        attribute_name = "price"
+        key_type       = "RANGE"
+      }
+    ]
+    projection_type = "ALL"
+  }
+]
+```
+
+**Ventajas del nuevo patrón:**
+- ✅ Soporta Multi-Attribute Keys (hasta 4 HASH + 4 RANGE)
+- ✅ Elimina warnings de deprecación
+- ✅ Alineado con mejores prácticas de AWS
+
+Ver `MIGRACION_GSI_KEY_SCHEMA.md` para guía completa de migración.
 
 ## Outputs
 
@@ -413,6 +618,10 @@ dynamo_config = {
 | `table_names` | Map of DynamoDB table names by table key | `map(string)` |
 | `table_stream_arns` | Map of DynamoDB table stream ARNs (only for tables with streams enabled) | `map(string)` |
 | `table_stream_labels` | Map of DynamoDB table stream labels (only for tables with streams enabled) | `map(string)` |
+| `table_gsi_names` | Map of Global Secondary Index names by table key | `map(list(string))` |
+| `table_lsi_names` | Map of Local Secondary Index names by table key | `map(list(string))` |
+| `autoscaling_read_policy_arns` | Map of Auto Scaling read policy ARNs by table key | `map(string)` |
+| `autoscaling_write_policy_arns` | Map of Auto Scaling write policy ARNs by table key | `map(string)` |
 
 ### Ejemplo de Uso de Outputs
 
@@ -422,6 +631,15 @@ orders_table_arn = module.dynamodb.table_arns["orders"]
 
 # Obtener nombre de una tabla
 products_table_name = module.dynamodb.table_names["products"]
+
+# Obtener stream ARN para conectar con Lambda
+audit_stream_arn = module.dynamodb.table_stream_arns["audit-log"]
+
+# Obtener nombres de GSI de una tabla
+product_gsi_names = module.dynamodb.table_gsi_names["products"]
+
+# Obtener ARN de política de autoscaling
+inventory_read_policy = module.dynamodb.autoscaling_read_policy_arns["inventory"]
 
 # Obtener todos los ARNs
 all_table_arns = module.dynamodb.table_arns
@@ -637,23 +855,104 @@ dynamo_config = {
 
 1. **prevent_destroy no configurable:** Debido a limitaciones de Terraform, `prevent_destroy` en el bloque `lifecycle` debe ser un valor literal y no puede ser configurado dinámicamente por variable. Está siempre habilitado (`true`) para proteger las tablas. Para deshabilitar, se debe modificar manualmente el código del módulo.
 
-2. **GSI/LSI:** El módulo no incluye soporte para Global Secondary Indexes (GSI) o Local Secondary Indexes (LSI) en esta versión.
+2. **Multi-Attribute Keys:** Aunque el módulo soporta el patrón Multi-Attribute Keys en GSI (hasta 4 HASH + 4 RANGE), este es un patrón avanzado que debe usarse con precaución. Consulta la [documentación de AWS](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.DesignPattern.MultiAttributeKeys.html) antes de implementarlo.
 
-3. **Auto Scaling:** El módulo no configura auto scaling para tablas con billing_mode = PROVISIONED.
+3. **Auto Scaling y PAY_PER_REQUEST:** Auto Scaling solo está disponible para tablas con `billing_mode = "PROVISIONED"`. Las tablas con modo on-demand (`PAY_PER_REQUEST`) escalan automáticamente sin configuración adicional.
 
-4. **TTL:** El módulo no configura Time To Live (TTL) automáticamente.
+4. **LSI Limitaciones:** Los Local Secondary Indexes solo pueden crearse al momento de crear la tabla y no pueden ser modificados después. Además, requieren que la tabla tenga un `range_key` (sort key).
+
+## Características Implementadas
+
+### ✅ Versión 2.0.0 (Actual)
+- ✅ **Global Secondary Indexes (GSI)** con patrón `key_schema`
+- ✅ **Local Secondary Indexes (LSI)**
+- ✅ **Auto Scaling** para tablas PROVISIONED
+- ✅ **DynamoDB Streams** para captura de cambios
+- ✅ **Time To Live (TTL)** para eliminación automática
+- ✅ **Multi-Attribute Keys** en GSI (hasta 4 HASH + 4 RANGE)
+- ✅ Migración de `hash_key`/`range_key` deprecados a `key_schema`
+
+### ✅ Versión 1.1.0
+- ✅ Soporte completo para DynamoDB Streams
+- ✅ Validaciones exhaustivas (20+ validaciones)
+- ✅ Outputs granulares para streams
+
+### ✅ Versión 1.0.0
+- ✅ Creación de tablas DynamoDB con `for_each`
+- ✅ Cifrado en reposo obligatorio con KMS
+- ✅ Point-in-time recovery
+- ✅ Protección contra eliminación
+- ✅ Réplicas globales
+- ✅ Cumplimiento PC-IAC 100%
 
 ## Roadmap
 
 Características planificadas para futuras versiones:
 
-- [x] Soporte para DynamoDB Streams ✅ (Implementado)
-- [ ] Soporte para Global Secondary Indexes (GSI)
-- [ ] Soporte para Local Secondary Indexes (LSI)
-- [ ] Configuración de Auto Scaling para modo PROVISIONED
-- [ ] Configuración de Time To Live (TTL)
-- [ ] Tests automatizados con Terratest
 - [ ] Soporte para DynamoDB Contributor Insights
+- [ ] Soporte para DynamoDB Table Classes (STANDARD_INFREQUENT_ACCESS)
+- [ ] Soporte para On-Demand Throughput configuration
+- [ ] Tests automatizados con Terratest
+- [ ] Soporte para Import from S3
+- [ ] Ejemplos avanzados de Multi-Attribute Keys
+- [ ] Integración con AWS Backup para backups centralizados
+
+## Migración de v1.x a v2.0.0
+
+### ⚠️ Breaking Change: GSI key_schema
+
+La versión 2.0.0 introduce un cambio importante en la forma de definir Global Secondary Indexes. Los atributos `hash_key` y `range_key` han sido reemplazados por `key_schema`.
+
+**Razón del cambio:**
+- Los atributos `hash_key` y `range_key` están deprecados en el provider AWS de Terraform
+- El nuevo patrón `key_schema` soporta Multi-Attribute Keys (hasta 4 HASH + 4 RANGE)
+- Elimina warnings de deprecación
+- Alineado con las mejores prácticas de AWS
+
+### Guía Rápida de Migración
+
+**ANTES (v1.x):**
+```hcl
+global_secondary_indexes = [
+  {
+    name            = "category-index"
+    hash_key        = "category"
+    range_key       = "price"
+    projection_type = "ALL"
+  }
+]
+```
+
+**DESPUÉS (v2.0):**
+```hcl
+global_secondary_indexes = [
+  {
+    name = "category-index"
+    key_schema = [
+      {
+        attribute_name = "category"
+        key_type       = "HASH"
+      },
+      {
+        attribute_name = "price"
+        key_type       = "RANGE"
+      }
+    ]
+    projection_type = "ALL"
+  }
+]
+```
+
+### Pasos de Migración
+
+1. **Actualizar archivos `.tfvars`** con el nuevo formato de `key_schema`
+2. **Ejecutar `terraform plan`** para verificar el impacto
+3. **Revisar si Terraform planea recrear índices**
+4. **Aplicar cambios** (preferiblemente en horario de bajo tráfico si hay recreación)
+
+**Documentación Completa:** Ver `MIGRACION_GSI_KEY_SCHEMA.md` para guía detallada de migración.
+
+---
 
 ## Soporte y Contribuciones
 
@@ -669,7 +968,30 @@ Este módulo es mantenido por el equipo de CloudOps de Pragma.
 
 ## Referencias
 
+### Documentación AWS
 - [AWS DynamoDB Documentation](https://docs.aws.amazon.com/dynamodb/)
-- [Terraform AWS Provider - DynamoDB Table](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_table)
 - [DynamoDB Best Practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html)
+- [DynamoDB Global Secondary Indexes](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.html)
+- [DynamoDB Multi-Attribute Keys Pattern](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.DesignPattern.MultiAttributeKeys.html)
+- [DynamoDB Streams](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.html)
+- [DynamoDB Time To Live](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html)
+- [DynamoDB Auto Scaling](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/AutoScaling.html)
+
+### Terraform
+- [Terraform AWS Provider - DynamoDB Table](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_table)
+- [Terraform AWS Provider v6.33.0](https://registry.terraform.io/providers/hashicorp/aws/6.33.0)
+
+### Gobernanza PC-IAC
 - [PC-IAC Governance Rules](https://github.com/pragma/pc-iac-rules)
+- Ver `VALIDACION_MODULO_DYNAMODB.md` para reporte de cumplimiento completo
+
+### Documentación del Módulo
+- `CHANGELOG.md` - Historial de cambios por versión
+- `MIGRACION_GSI_KEY_SCHEMA.md` - Guía de migración v1.x → v2.0
+- `ANALISIS_WARNINGS_GSI.md` - Análisis técnico de warnings deprecados
+- `IMPLEMENTACION_GSI_LSI_AUTOSCALING_TTL.md` - Guía de implementación de características avanzadas
+- `VALIDACION_MODULO_DYNAMODB.md` - Reporte de cumplimiento PC-IAC
+
+---
+
+> Este módulo ha sido desarrollado siguiendo los estándares de Pragma CloudOps, garantizando una implementación segura, escalable y optimizada que cumple con todas las políticas de la organización. Pragma CloudOps recomienda revisar este código con su equipo de infraestructura antes de implementarlo en producción.
