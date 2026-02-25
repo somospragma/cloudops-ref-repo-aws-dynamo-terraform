@@ -162,9 +162,10 @@ variable "dynamo_config" {
   validation {
     condition = alltrue([
       for k, v in var.dynamo_config :
-      v.billing_mode != "PROVISIONED" || (
+      v.billing_mode != "PROVISIONED" || try(
         v.read_capacity != null && v.read_capacity > 0 &&
-        v.write_capacity != null && v.write_capacity > 0
+        v.write_capacity != null && v.write_capacity > 0,
+        false
       )
     ])
     error_message = "read_capacity and write_capacity must be specified and > 0 when billing_mode is PROVISIONED."
@@ -191,7 +192,7 @@ variable "dynamo_config" {
   validation {
     condition = alltrue([
       for k, v in var.dynamo_config :
-      v.range_key == null || contains([for attr in v.attributes : attr.name], v.range_key)
+      try(v.range_key == null || contains([for attr in v.attributes : attr.name], v.range_key), true)
     ])
     error_message = "range_key must be defined in the attributes list when specified."
   }
@@ -336,7 +337,7 @@ variable "dynamo_config" {
   validation {
     condition = alltrue([
       for k, v in var.dynamo_config :
-      v.autoscaling_read == null || (v.autoscaling_read.min_capacity > 0 && v.autoscaling_read.max_capacity > 0 && v.autoscaling_read.max_capacity >= v.autoscaling_read.min_capacity)
+      try(v.autoscaling_read == null || (v.autoscaling_read.min_capacity > 0 && v.autoscaling_read.max_capacity > 0 && v.autoscaling_read.max_capacity >= v.autoscaling_read.min_capacity), true)
     ])
     error_message = "Auto Scaling read: min_capacity and max_capacity must be > 0, and max_capacity >= min_capacity."
   }
@@ -344,7 +345,7 @@ variable "dynamo_config" {
   validation {
     condition = alltrue([
       for k, v in var.dynamo_config :
-      v.autoscaling_write == null || (v.autoscaling_write.min_capacity > 0 && v.autoscaling_write.max_capacity > 0 && v.autoscaling_write.max_capacity >= v.autoscaling_write.min_capacity)
+      try(v.autoscaling_write == null || (v.autoscaling_write.min_capacity > 0 && v.autoscaling_write.max_capacity > 0 && v.autoscaling_write.max_capacity >= v.autoscaling_write.min_capacity), true)
     ])
     error_message = "Auto Scaling write: min_capacity and max_capacity must be > 0, and max_capacity >= min_capacity."
   }
@@ -352,7 +353,7 @@ variable "dynamo_config" {
   validation {
     condition = alltrue([
       for k, v in var.dynamo_config :
-      v.autoscaling_read == null || (v.autoscaling_read.target_utilization > 0 && v.autoscaling_read.target_utilization <= 100)
+      try(v.autoscaling_read == null || (v.autoscaling_read.target_utilization > 0 && v.autoscaling_read.target_utilization <= 100), true)
     ])
     error_message = "Auto Scaling read target_utilization must be between 1 and 100."
   }
@@ -360,7 +361,7 @@ variable "dynamo_config" {
   validation {
     condition = alltrue([
       for k, v in var.dynamo_config :
-      v.autoscaling_write == null || (v.autoscaling_write.target_utilization > 0 && v.autoscaling_write.target_utilization <= 100)
+      try(v.autoscaling_write == null || (v.autoscaling_write.target_utilization > 0 && v.autoscaling_write.target_utilization <= 100), true)
     ])
     error_message = "Auto Scaling write target_utilization must be between 1 and 100."
   }

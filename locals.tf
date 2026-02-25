@@ -38,7 +38,7 @@ locals {
   valid_keys = {
     for key, config in var.dynamo_config : key => (
       contains(local.attribute_names[key], config.hash_key) &&
-      (config.range_key == null || contains(local.attribute_names[key], config.range_key))
+      try(config.range_key == null || contains(local.attribute_names[key], config.range_key), true)
     )
   }
 }
