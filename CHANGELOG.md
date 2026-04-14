@@ -7,6 +7,33 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-04-13
+
+### Added
+
+#### Lambda Triggers (DynamoDB Streams → Lambda)
+
+Se añade soporte para configurar Lambda event source mappings directamente desde el módulo mediante el nuevo atributo `lambda_triggers` en `dynamo_config`.
+
+**Características:**
+- Configuración completa de `aws_lambda_event_source_mapping` por tabla
+- Soporte para múltiples triggers por tabla
+- Dead Letter Queue (SQS/SNS) para registros fallidos
+- Event filtering con patrones personalizados
+- Batch processing configurable (1-10000 registros)
+- Paralelización por shard (1-10 batches concurrentes)
+- Tumbling windows para streaming analytics
+- Soporte para `ReportBatchItemFailures`
+- 9 validaciones para prevenir errores de configuración
+
+**Nuevos Outputs:**
+- `lambda_trigger_arns` - ARNs de los event source mappings
+- `lambda_trigger_uuids` - UUIDs de los event source mappings
+
+**Requisito:** `stream_enabled = true` en la tabla que configure triggers.
+
+Ver `changes/IMPLEMENTACION_LAMBDA_TRIGGERS.md` para documentación completa.
+
 ## [2.0.0] - 2026-02-24
 
 ### ⚠️ BREAKING CHANGES

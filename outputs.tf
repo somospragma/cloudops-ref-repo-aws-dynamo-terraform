@@ -68,3 +68,19 @@ output "autoscaling_write_policy_arns" {
     k => v.arn
   }
 }
+
+output "lambda_trigger_arns" {
+  description = "Map of Lambda event source mapping ARNs by table-trigger key"
+  value = {
+    for k, v in aws_lambda_event_source_mapping.dynamodb_trigger :
+    k => v.arn
+  }
+}
+
+output "lambda_trigger_uuids" {
+  description = "Map of Lambda event source mapping UUIDs by table-trigger key"
+  value = {
+    for k, v in aws_lambda_event_source_mapping.dynamodb_trigger :
+    k => v.uuid
+  }
+}

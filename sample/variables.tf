@@ -135,11 +135,23 @@ variable "dynamo_config" {
       scale_out_cooldown = optional(number, 60)
     }))
 
+    # Lambda Triggers (DynamoDB Streams → Lambda)
+    lambda_triggers = optional(list(object({
+      function_name                      = string
+      starting_position                  = optional(string, "LATEST")
+      enabled                            = optional(bool, true)
+      batch_size                         = optional(number, 100)
+      maximum_batching_window_in_seconds = optional(number, 0)
+      parallelization_factor             = optional(number, 1)
+      maximum_record_age_in_seconds      = optional(number, -1)
+      maximum_retry_attempts             = optional(number, -1)
+      bisect_batch_on_function_error     = optional(bool, false)
+      tumbling_window_in_seconds         = optional(number, 0)
+      function_response_types            = optional(list(string), [])
+      destination_on_failure_arn         = optional(string, "")
+      filter_pattern                     = optional(string, "")
+    })), [])
+
     functionality = string
   }))
 }
-
-
-
-
-

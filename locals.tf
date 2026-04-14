@@ -41,4 +41,16 @@ locals {
       try(config.range_key == null || contains(local.attribute_names[key], config.range_key), true)
     )
   }
+
+  # Mapa plano de Lambda triggers para for_each (PC-IAC-010)
+  # Genera claves tipo "table_key-index" para cada trigger
+  lambda_trigger_map = merge([
+    for table_key, config in var.dynamo_config : {
+      for idx, trigger in config.lambda_triggers :
+      "${table_key}-${idx}" => {
+        table_key = table_key
+        trigger   = trigger
+      }
+    }
+  ]...)
 }

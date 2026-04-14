@@ -207,3 +207,56 @@ resource "aws_appautoscaling_policy" "dynamodb_table_write_policy" {
     scale_out_cooldown = each.value.autoscaling_write.scale_out_cooldown
   }
 }
+
+############################################################################
+# Lambda Triggers (DynamoDB Streams → Lambda)
+############################################################################
+
+resource "aws_lambda_event_source_mapping" "dynamodb_trigger" {
+  provider = aws.project
+  for_each = local.lambda_trigger_map
+
+  event_source_arn  = aws_dynamodb_table.dynamo_table[each.value.table_key].stream_arn
+  function_name     = each.value.trigger.function_name
+  starting_position = each.value.trigger.starting_position
+  enabled           = each.value.trigger.enabled
+
+  batch_size                         = each.value.trigger.batch_size
+  maximum_batching_window_in_seconds = each.value.trigger.maximum_batching_window_in_seconds
+  parallelization_factor             = each.value.trigger.parallelization_factor
+  maximum_record_age_in_seconds      = each.value.trigger.maximum_record_age_in_seconds
+  maximum_retry_attempts             = each.value.trigger.maximum_retry_attempts
+  bisect_batch_on_function_error     = each.value.trigger.bisect_batch_on_function_error
+  tumbling_window_in_seconds         = each.value.trigger.tumbling_window_in_seconds > 0 ? each.value.trigger.tumbling_window_in_seconds : null
+  function_response_types            = length(each.value.trigger.function_response_types) > 0 ? each.value.trigger.function_response_types : null
+
+  # Dead Letter Queue (on_failure destination)
+  dynamic "destination_config" {
+    for_each = length(each.value.trigger.destination_on_failure_arn) > 0 ? [1] : []
+    content {
+      on_failure {
+        destination_arn = each.value.trigger.destination_on_failure_arn
+      }
+    }
+  }
+
+  # Event filtering
+  dynamic "filter_criteria" {
+    for_each = length(each.value.trigger.filter_pattern) > 0 ? [1] : []
+    content {
+      filter {
+        pattern = each.value.trigger.filter_pattern
+      }
+    }
+  }
+
+  tags = merge(
+    {
+      Name      = "${local.table_names[each.value.table_key]}-lambda-trigger"
+      TableKey  = each.value.table_key
+      ManagedBy = "terraform"
+      Module    = "dynamodb-module"
+    },
+    try(var.dynamo_config[each.value.table_key].additional_tags, {})
+  )
+}

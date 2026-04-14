@@ -134,6 +134,23 @@ variable "dynamo_config" {
       scale_out_cooldown = optional(number, 60)
     }))
 
+    # Lambda Triggers (DynamoDB Streams → Lambda)
+    lambda_triggers = optional(list(object({
+      function_name                      = string                    # ARN o nombre de la función Lambda
+      starting_position                  = optional(string, "LATEST") # LATEST | TRIM_HORIZON
+      enabled                            = optional(bool, true)
+      batch_size                         = optional(number, 100)      # 1-10000
+      maximum_batching_window_in_seconds = optional(number, 0)        # 0-300
+      parallelization_factor             = optional(number, 1)        # 1-10
+      maximum_record_age_in_seconds      = optional(number, -1)       # -1 o 60-604800
+      maximum_retry_attempts             = optional(number, -1)       # -1 o 0-10000
+      bisect_batch_on_function_error     = optional(bool, false)
+      tumbling_window_in_seconds         = optional(number, 0)        # 0-900
+      function_response_types            = optional(list(string), []) # ["ReportBatchItemFailures"]
+      destination_on_failure_arn         = optional(string, "")       # ARN de SQS/SNS para DLQ
+      filter_pattern                     = optional(string, "")       # Patrón de filtrado de eventos
+    })), [])
+
     functionality   = string
     additional_tags = optional(map(string), {})
   }))
@@ -364,5 +381,98 @@ variable "dynamo_config" {
       try(v.autoscaling_write == null || (v.autoscaling_write.target_utilization > 0 && v.autoscaling_write.target_utilization <= 100), true)
     ])
     error_message = "Auto Scaling write target_utilization must be between 1 and 100."
+  }
+
+  # ── Lambda Triggers validations ──
+
+  validation {
+    condition = alltrue([
+      for k, v in var.dynamo_config :
+      length(v.lambda_triggers) == 0 || v.stream_enabled
+    ])
+    error_message = "stream_enabled must be true when lambda_triggers are configured."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for k, v in var.dynamo_config : [
+        for trigger in v.lambda_triggers :
+        contains(["LATEST", "TRIM_HORIZON"], trigger.starting_position)
+      ]
+    ]))
+    error_message = "Lambda trigger starting_position must be either 'LATEST' or 'TRIM_HORIZON'."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for k, v in var.dynamo_config : [
+        for trigger in v.lambda_triggers :
+        trigger.batch_size >= 1 && trigger.batch_size <= 10000
+      ]
+    ]))
+    error_message = "Lambda trigger batch_size must be between 1 and 10000."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for k, v in var.dynamo_config : [
+        for trigger in v.lambda_triggers :
+        trigger.parallelization_factor >= 1 && trigger.parallelization_factor <= 10
+      ]
+    ]))
+    error_message = "Lambda trigger parallelization_factor must be between 1 and 10."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for k, v in var.dynamo_config : [
+        for trigger in v.lambda_triggers :
+        trigger.maximum_batching_window_in_seconds >= 0 && trigger.maximum_batching_window_in_seconds <= 300
+      ]
+    ]))
+    error_message = "Lambda trigger maximum_batching_window_in_seconds must be between 0 and 300."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for k, v in var.dynamo_config : [
+        for trigger in v.lambda_triggers :
+        trigger.tumbling_window_in_seconds >= 0 && trigger.tumbling_window_in_seconds <= 900
+      ]
+    ]))
+    error_message = "Lambda trigger tumbling_window_in_seconds must be between 0 and 900."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for k, v in var.dynamo_config : [
+        for trigger in v.lambda_triggers :
+        length(trigger.function_response_types) == 0 || alltrue([
+          for frt in trigger.function_response_types :
+          contains(["ReportBatchItemFailures"], frt)
+        ])
+      ]
+    ]))
+    error_message = "Lambda trigger function_response_types only supports 'ReportBatchItemFailures'."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for k, v in var.dynamo_config : [
+        for trigger in v.lambda_triggers :
+        trigger.maximum_record_age_in_seconds == -1 || (trigger.maximum_record_age_in_seconds >= 60 && trigger.maximum_record_age_in_seconds <= 604800)
+      ]
+    ]))
+    error_message = "Lambda trigger maximum_record_age_in_seconds must be -1 (forever) or between 60 and 604800."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for k, v in var.dynamo_config : [
+        for trigger in v.lambda_triggers :
+        trigger.maximum_retry_attempts == -1 || (trigger.maximum_retry_attempts >= 0 && trigger.maximum_retry_attempts <= 10000)
+      ]
+    ]))
+    error_message = "Lambda trigger maximum_retry_attempts must be -1 (forever) or between 0 and 10000."
   }
 }

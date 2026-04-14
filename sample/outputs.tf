@@ -15,3 +15,13 @@ output "table_ids" {
   description = "IDs of created DynamoDB tables"
   value       = module.dynamo.table_ids
 }
+
+output "lambda_trigger_arns" {
+  description = "ARNs of Lambda event source mappings"
+  value       = module.dynamo.lambda_trigger_arns
+}
+
+output "lambda_trigger_uuids" {
+  description = "UUIDs of Lambda event source mappings"
+  value       = module.dynamo.lambda_trigger_uuids
+}

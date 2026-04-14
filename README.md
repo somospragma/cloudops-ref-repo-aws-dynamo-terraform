@@ -22,6 +22,7 @@ Este módulo permite la creación y gestión completa de tablas DynamoDB en AWS,
 - ✅ **Auto Scaling** - Escalado automático para tablas PROVISIONED
 - ✅ **DynamoDB Streams** - Captura de cambios en tiempo real
 - ✅ **Time To Live (TTL)** - Eliminación automática de items expirados
+- ✅ **Lambda Triggers** - Event source mappings de DynamoDB Streams a Lambda
 
 Consulta `CHANGELOG.md` para la lista completa de cambios de cada versión. *Recomendamos encarecidamente que en tu código fijes la versión exacta que estás utilizando para que tu infraestructura permanezca estable y actualices las versiones de manera sistemática para evitar sorpresas.*
 
@@ -435,6 +436,95 @@ output "audit_stream_arn" {
 - `OLD_IMAGE` - El item completo antes de la modificación
 - `NEW_AND_OLD_IMAGES` - El item completo antes y después (recomendado)
 
+### Ejemplo con Lambda Triggers
+
+```hcl
+module "dynamodb" {
+  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v2.1.0"
+  
+  providers = {
+    aws.project = aws.principal
+  }
+
+  client      = "pragma"
+  project     = "events"
+  environment = "pdn"
+  application = "processor"
+
+  dynamo_config = {
+    "events" = {
+      billing_mode  = "PAY_PER_REQUEST"
+      hash_key      = "event_id"
+      range_key     = "timestamp"
+      functionality = "event-processing"
+
+      # Streams requerido para Lambda triggers
+      stream_enabled   = true
+      stream_view_type = "NEW_AND_OLD_IMAGES"
+
+      attributes = [
+        {
+          name = "event_id"
+          type = "S"
+        },
+        {
+          name = "timestamp"
+          type = "N"
+        }
+      ]
+
+      server_side_encryption = {
+        enabled     = true
+        kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+      }
+
+      # Lambda Triggers - Procesar eventos con Lambda
+      lambda_triggers = [
+        {
+          function_name                  = "arn:aws:lambda:us-east-1:123456789012:function:process-events"
+          starting_position              = "LATEST"
+          batch_size                     = 100
+          maximum_batching_window_in_seconds = 5
+          parallelization_factor         = 2
+          bisect_batch_on_function_error = true
+          maximum_retry_attempts         = 3
+          function_response_types        = ["ReportBatchItemFailures"]
+          destination_on_failure_arn     = "arn:aws:sqs:us-east-1:123456789012:events-dlq"
+        }
+      ]
+
+      point_in_time_recovery      = true
+      deletion_protection_enabled = true
+    }
+  }
+}
+
+# Usar los outputs del trigger
+output "event_trigger_arn" {
+  value = module.dynamodb.lambda_trigger_arns["events-0"]
+}
+```
+
+**Parámetros de Lambda Triggers:**
+
+| Parámetro | Descripción | Default |
+|-----------|-------------|---------|
+| `function_name` | ARN o nombre de la función Lambda (requerido) | - |
+| `starting_position` | Posición inicial en el stream | `"LATEST"` |
+| `enabled` | Si el trigger está activo | `true` |
+| `batch_size` | Registros por invocación (1-10000) | `100` |
+| `maximum_batching_window_in_seconds` | Tiempo máximo de espera (0-300s) | `0` |
+| `parallelization_factor` | Batches concurrentes por shard (1-10) | `1` |
+| `maximum_record_age_in_seconds` | Edad máxima de registros (-1 o 60-604800) | `-1` |
+| `maximum_retry_attempts` | Reintentos máximos (-1 o 0-10000) | `-1` |
+| `bisect_batch_on_function_error` | Dividir batch en error | `false` |
+| `tumbling_window_in_seconds` | Ventana de agregación (0-900s) | `0` |
+| `function_response_types` | Tipos de respuesta | `[]` |
+| `destination_on_failure_arn` | ARN de DLQ (SQS/SNS) para fallos | `""` |
+| `filter_pattern` | Patrón de filtrado de eventos | `""` |
+
+> **Nota:** `stream_enabled` debe ser `true` en la tabla para poder configurar `lambda_triggers`. El módulo valida esta dependencia automáticamente.
+
 ## Requirements
 
 | Name | Version |
@@ -453,6 +543,9 @@ output "audit_stream_arn" {
 | Name | Type |
 |------|------|
 | [aws_dynamodb_table](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_table) | resource |
+| [aws_appautoscaling_target](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/appautoscaling_target) | resource |
+| [aws_appautoscaling_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/appautoscaling_policy) | resource |
+| [aws_lambda_event_source_mapping](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_event_source_mapping) | resource |
 
 ## Inputs
 
@@ -560,6 +653,23 @@ dynamo_config = {
       scale_out_cooldown = optional(number, 60)
     }))
 
+    # Lambda Triggers (requiere stream_enabled = true)
+    lambda_triggers = optional(list(object({
+      function_name                      = string                    # ARN o nombre de la función Lambda
+      starting_position                  = optional(string, "LATEST") # "LATEST" o "TRIM_HORIZON"
+      enabled                            = optional(bool, true)
+      batch_size                         = optional(number, 100)      # 1-10000
+      maximum_batching_window_in_seconds = optional(number, 0)        # 0-300 segundos
+      parallelization_factor             = optional(number, 1)        # 1-10
+      maximum_record_age_in_seconds      = optional(number, -1)       # -1 (forever) o 60-604800
+      maximum_retry_attempts             = optional(number, -1)       # -1 (forever) o 0-10000
+      bisect_batch_on_function_error     = optional(bool, false)
+      tumbling_window_in_seconds         = optional(number, 0)        # 0-900
+      function_response_types            = optional(list(string), []) # ["ReportBatchItemFailures"]
+      destination_on_failure_arn         = optional(string, "")       # ARN de SQS/SNS para DLQ
+      filter_pattern                     = optional(string, "")       # Patrón de filtrado de eventos
+    })), [])
+
     # Etiquetas adicionales (opcional)
     additional_tags = optional(map(string), {})
   }
@@ -622,6 +732,8 @@ Ver `MIGRACION_GSI_KEY_SCHEMA.md` para guía completa de migración.
 | `table_lsi_names` | Map of Local Secondary Index names by table key | `map(list(string))` |
 | `autoscaling_read_policy_arns` | Map of Auto Scaling read policy ARNs by table key | `map(string)` |
 | `autoscaling_write_policy_arns` | Map of Auto Scaling write policy ARNs by table key | `map(string)` |
+| `lambda_trigger_arns` | Map of Lambda event source mapping ARNs by table-trigger key | `map(string)` |
+| `lambda_trigger_uuids` | Map of Lambda event source mapping UUIDs by table-trigger key | `map(string)` |
 
 ### Ejemplo de Uso de Outputs
 
@@ -640,6 +752,12 @@ product_gsi_names = module.dynamodb.table_gsi_names["products"]
 
 # Obtener ARN de política de autoscaling
 inventory_read_policy = module.dynamodb.autoscaling_read_policy_arns["inventory"]
+
+# Obtener ARN de un Lambda trigger
+event_trigger_arn = module.dynamodb.lambda_trigger_arns["events-0"]
+
+# Obtener UUID de un Lambda trigger
+event_trigger_uuid = module.dynamodb.lambda_trigger_uuids["events-0"]
 
 # Obtener todos los ARNs
 all_table_arns = module.dynamodb.table_arns
@@ -869,6 +987,7 @@ dynamo_config = {
 - ✅ **Auto Scaling** para tablas PROVISIONED
 - ✅ **DynamoDB Streams** para captura de cambios
 - ✅ **Time To Live (TTL)** para eliminación automática
+- ✅ **Lambda Triggers** - Event source mappings de DynamoDB Streams a Lambda con DLQ, filtrado y batch processing
 - ✅ **Multi-Attribute Keys** en GSI (hasta 4 HASH + 4 RANGE)
 - ✅ Migración de `hash_key`/`range_key` deprecados a `key_schema`
 
@@ -979,6 +1098,7 @@ Este módulo es mantenido por el equipo de CloudOps de Pragma.
 
 ### Terraform
 - [Terraform AWS Provider - DynamoDB Table](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_table)
+- [Terraform AWS Provider - Lambda Event Source Mapping](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_event_source_mapping)
 - [Terraform AWS Provider v6.33.0](https://registry.terraform.io/providers/hashicorp/aws/6.33.0)
 
 ### Gobernanza PC-IAC
