@@ -209,6 +209,76 @@ resource "aws_appautoscaling_policy" "dynamodb_table_write_policy" {
 }
 
 ############################################################################
+# GSI Auto Scaling Configuration (solo para PROVISIONED)
+############################################################################
+
+# Auto Scaling Target - GSI Read Capacity
+resource "aws_appautoscaling_target" "gsi_read" {
+  provider = aws.project
+  for_each = local.gsi_autoscaling_read_map
+
+  max_capacity       = each.value.config.max_capacity
+  min_capacity       = each.value.config.min_capacity
+  resource_id        = "table/${aws_dynamodb_table.dynamo_table[each.value.table_key].name}/index/${each.value.gsi_name}"
+  scalable_dimension = "dynamodb:index:ReadCapacityUnits"
+  service_namespace  = "dynamodb"
+}
+
+# Auto Scaling Policy - GSI Read Capacity
+resource "aws_appautoscaling_policy" "gsi_read_policy" {
+  provider = aws.project
+  for_each = local.gsi_autoscaling_read_map
+
+  name               = "${local.table_names[each.value.table_key]}-${each.value.gsi_name}-read-scaling-policy"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.gsi_read[each.key].resource_id
+  scalable_dimension = aws_appautoscaling_target.gsi_read[each.key].scalable_dimension
+  service_namespace  = aws_appautoscaling_target.gsi_read[each.key].service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "DynamoDBReadCapacityUtilization"
+    }
+    target_value       = each.value.config.target_utilization
+    scale_in_cooldown  = each.value.config.scale_in_cooldown
+    scale_out_cooldown = each.value.config.scale_out_cooldown
+  }
+}
+
+# Auto Scaling Target - GSI Write Capacity
+resource "aws_appautoscaling_target" "gsi_write" {
+  provider = aws.project
+  for_each = local.gsi_autoscaling_write_map
+
+  max_capacity       = each.value.config.max_capacity
+  min_capacity       = each.value.config.min_capacity
+  resource_id        = "table/${aws_dynamodb_table.dynamo_table[each.value.table_key].name}/index/${each.value.gsi_name}"
+  scalable_dimension = "dynamodb:index:WriteCapacityUnits"
+  service_namespace  = "dynamodb"
+}
+
+# Auto Scaling Policy - GSI Write Capacity
+resource "aws_appautoscaling_policy" "gsi_write_policy" {
+  provider = aws.project
+  for_each = local.gsi_autoscaling_write_map
+
+  name               = "${local.table_names[each.value.table_key]}-${each.value.gsi_name}-write-scaling-policy"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.gsi_write[each.key].resource_id
+  scalable_dimension = aws_appautoscaling_target.gsi_write[each.key].scalable_dimension
+  service_namespace  = aws_appautoscaling_target.gsi_write[each.key].service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "DynamoDBWriteCapacityUtilization"
+    }
+    target_value       = each.value.config.target_utilization
+    scale_in_cooldown  = each.value.config.scale_in_cooldown
+    scale_out_cooldown = each.value.config.scale_out_cooldown
+  }
+}
+
+############################################################################
 # Lambda Triggers (DynamoDB Streams → Lambda)
 ############################################################################
 

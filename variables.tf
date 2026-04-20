@@ -107,6 +107,22 @@ variable "dynamo_config" {
       non_key_attributes = optional(list(string), [])
       read_capacity      = optional(number)
       write_capacity     = optional(number)
+
+      # Auto Scaling para GSI (solo para PROVISIONED)
+      autoscaling_read = optional(object({
+        min_capacity       = number
+        max_capacity       = number
+        target_utilization = optional(number, 70)
+        scale_in_cooldown  = optional(number, 60)
+        scale_out_cooldown = optional(number, 60)
+      }))
+      autoscaling_write = optional(object({
+        min_capacity       = number
+        max_capacity       = number
+        target_utilization = optional(number, 70)
+        scale_in_cooldown  = optional(number, 60)
+        scale_out_cooldown = optional(number, 60)
+      }))
     })), [])
 
     # Local Secondary Indexes (LSI)
@@ -278,19 +294,30 @@ variable "dynamo_config" {
     condition = alltrue(flatten([
       for k, v in var.dynamo_config : [
         for gsi in v.global_secondary_indexes :
-        length(gsi.key_schema) > 0 && length(gsi.key_schema) <= 8
+        length(gsi.key_schema) > 0 && length(gsi.key_schema) <= 2
       ]
     ]))
-    error_message = "GSI key_schema must have between 1 and 8 key definitions (up to 4 HASH + 4 RANGE)."
+    error_message = "GSI key_schema must have 1 (HASH) or 2 (HASH + RANGE) key definitions."
   }
 
   validation {
     condition = alltrue(flatten([
       for k, v in var.dynamo_config : [
         for gsi in v.global_secondary_indexes :
-        v.billing_mode != "PROVISIONED" || (
+        length([for ks in gsi.key_schema : ks if ks.key_type == "HASH"]) == 1
+      ]
+    ]))
+    error_message = "Each GSI key_schema must have exactly one HASH key."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for k, v in var.dynamo_config : [
+        for gsi in v.global_secondary_indexes :
+        v.billing_mode != "PROVISIONED" || try(
           gsi.read_capacity != null && gsi.read_capacity > 0 &&
-          gsi.write_capacity != null && gsi.write_capacity > 0
+          gsi.write_capacity != null && gsi.write_capacity > 0,
+          false
         )
       ]
     ]))

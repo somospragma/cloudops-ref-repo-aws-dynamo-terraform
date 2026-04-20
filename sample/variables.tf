@@ -110,6 +110,22 @@ variable "dynamo_config" {
       non_key_attributes = optional(list(string), [])
       read_capacity      = optional(number)
       write_capacity     = optional(number)
+
+      # Auto Scaling para GSI (solo para PROVISIONED)
+      autoscaling_read = optional(object({
+        min_capacity       = number
+        max_capacity       = number
+        target_utilization = optional(number, 70)
+        scale_in_cooldown  = optional(number, 60)
+        scale_out_cooldown = optional(number, 60)
+      }))
+      autoscaling_write = optional(object({
+        min_capacity       = number
+        max_capacity       = number
+        target_utilization = optional(number, 70)
+        scale_in_cooldown  = optional(number, 60)
+        scale_out_cooldown = optional(number, 60)
+      }))
     })), [])
 
     local_secondary_indexes = optional(list(object({

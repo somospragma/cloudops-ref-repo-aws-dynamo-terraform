@@ -69,6 +69,22 @@ output "autoscaling_write_policy_arns" {
   }
 }
 
+output "gsi_autoscaling_read_policy_arns" {
+  description = "Map of GSI Auto Scaling read policy ARNs by table-gsi key"
+  value = {
+    for k, v in aws_appautoscaling_policy.gsi_read_policy :
+    k => v.arn
+  }
+}
+
+output "gsi_autoscaling_write_policy_arns" {
+  description = "Map of GSI Auto Scaling write policy ARNs by table-gsi key"
+  value = {
+    for k, v in aws_appautoscaling_policy.gsi_write_policy :
+    k => v.arn
+  }
+}
+
 output "lambda_trigger_arns" {
   description = "Map of Lambda event source mapping ARNs by table-trigger key"
   value = {

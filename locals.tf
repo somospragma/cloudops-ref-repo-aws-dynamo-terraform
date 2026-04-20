@@ -14,34 +14,6 @@ locals {
     key => "${local.governance_prefix}-ddb-${var.application}-${key}"
   }
 
-  # Transformación de configuración con valores por defecto seguros (PC-IAC-009)
-  dynamo_config_with_defaults = {
-    for key, config in var.dynamo_config : key => merge(config, {
-      # Valores por defecto de seguridad (PC-IAC-020)
-      deletion_protection_enabled = try(config.deletion_protection_enabled, true)
-      point_in_time_recovery      = try(config.point_in_time_recovery, true)
-
-      # Asegurar tipos correctos
-      replicas        = try(config.replicas, [])
-      additional_tags = try(config.additional_tags, {})
-    })
-  }
-
-  # Validación de consistencia de atributos
-  attribute_names = {
-    for key, config in var.dynamo_config : key => [
-      for attr in config.attributes : attr.name
-    ]
-  }
-
-  # Verificar que hash_key y range_key estén en attributes
-  valid_keys = {
-    for key, config in var.dynamo_config : key => (
-      contains(local.attribute_names[key], config.hash_key) &&
-      try(config.range_key == null || contains(local.attribute_names[key], config.range_key), true)
-    )
-  }
-
   # Mapa plano de Lambda triggers para for_each (PC-IAC-010)
   # Genera claves tipo "table_key-index" para cada trigger
   lambda_trigger_map = merge([
@@ -51,6 +23,32 @@ locals {
         table_key = table_key
         trigger   = trigger
       }
+    }
+  ]...)
+
+  # Mapa plano de GSI Auto Scaling para for_each
+  # Genera claves tipo "table_key-gsi_name" para read y write
+  gsi_autoscaling_read_map = merge([
+    for table_key, config in var.dynamo_config : {
+      for gsi in config.global_secondary_indexes :
+      "${table_key}-${gsi.name}" => {
+        table_key = table_key
+        gsi_name  = gsi.name
+        config    = gsi.autoscaling_read
+      }
+      if config.autoscaling_enabled && gsi.autoscaling_read != null
+    }
+  ]...)
+
+  gsi_autoscaling_write_map = merge([
+    for table_key, config in var.dynamo_config : {
+      for gsi in config.global_secondary_indexes :
+      "${table_key}-${gsi.name}" => {
+        table_key = table_key
+        gsi_name  = gsi.name
+        config    = gsi.autoscaling_write
+      }
+      if config.autoscaling_enabled && gsi.autoscaling_write != null
     }
   ]...)
 }
