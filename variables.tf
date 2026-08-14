@@ -150,6 +150,9 @@ variable "dynamo_config" {
       scale_out_cooldown = optional(number, 60)
     }))
 
+    # Resource-based Policy (opcional)
+    resource_policy = optional(string, null) # JSON de la resource-based policy para acceso cross-account
+
     # Lambda Triggers (DynamoDB Streams → Lambda)
     lambda_triggers = optional(list(object({
       function_name                      = string                    # ARN o nombre de la función Lambda
@@ -408,6 +411,16 @@ variable "dynamo_config" {
       try(v.autoscaling_write == null || (v.autoscaling_write.target_utilization > 0 && v.autoscaling_write.target_utilization <= 100), true)
     ])
     error_message = "Auto Scaling write target_utilization must be between 1 and 100."
+  }
+
+  # ── Resource Policy validations ──
+
+  validation {
+    condition = alltrue([
+      for k, v in var.dynamo_config :
+      v.resource_policy == null || can(jsondecode(v.resource_policy))
+    ])
+    error_message = "resource_policy must be a valid JSON string when specified."
   }
 
   # ── Lambda Triggers validations ──

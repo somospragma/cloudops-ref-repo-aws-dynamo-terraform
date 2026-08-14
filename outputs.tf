@@ -85,6 +85,14 @@ output "gsi_autoscaling_write_policy_arns" {
   }
 }
 
+output "table_resource_policy_revisions" {
+  description = "Map of DynamoDB resource policy revision IDs by table key"
+  value = {
+    for k, v in aws_dynamodb_resource_policy.table_policy :
+    k => v.revision_id
+  }
+}
+
 output "lambda_trigger_arns" {
   description = "Map of Lambda event source mapping ARNs by table-trigger key"
   value = {
