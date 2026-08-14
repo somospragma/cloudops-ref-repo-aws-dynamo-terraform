@@ -1,6 +1,6 @@
 # **Módulo Terraform: cloudops-ref-repo-aws-dynamo-terraform**
 
-**Versión:** 2.2.0  
+**Versión:** 2.1.1  
 **Última Actualización:** 13 de agosto de 2026
 
 ## Descripción
@@ -530,7 +530,7 @@ output "event_trigger_arn" {
 
 ```hcl
 module "dynamodb" {
-  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v2.2.0"
+  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v2.1.1"
   
   providers = {
     aws.project = aws.principal
