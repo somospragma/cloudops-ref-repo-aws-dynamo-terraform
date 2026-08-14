@@ -123,6 +123,22 @@ resource "aws_dynamodb_table" "dynamo_table" {
 
 
 ############################################################################
+# Resource-based Policy (acceso cross-account / permisos granulares)
+############################################################################
+
+resource "aws_dynamodb_resource_policy" "table_policy" {
+  provider = aws.project
+  for_each = {
+    for k, v in var.dynamo_config :
+    k => v
+    if v.resource_policy != null
+  }
+
+  resource_arn = aws_dynamodb_table.dynamo_table[each.key].arn
+  policy       = each.value.resource_policy
+}
+
+############################################################################
 # Auto Scaling Configuration (solo para PROVISIONED)
 ############################################################################
 

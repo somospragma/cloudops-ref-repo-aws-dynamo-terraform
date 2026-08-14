@@ -7,6 +7,48 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-08-13
+
+### Added
+
+#### Resource-based Policies para DynamoDB
+
+Se añade soporte para configurar resource-based policies directamente en las tablas DynamoDB mediante el nuevo atributo `resource_policy` en `dynamo_config`.
+
+**Características:**
+- Configuración de `aws_dynamodb_resource_policy` por tabla
+- Soporte para acceso cross-account
+- Permisos granulares a nivel de recurso (tabla)
+- Validación de JSON en tiempo de plan
+- Campo opcional — no afecta tablas existentes sin policy
+
+**Nuevo Output:**
+- `table_resource_policy_revisions` - Revision IDs de las policies creadas
+
+**Ejemplo de uso:**
+```hcl
+dynamo_config = {
+  "orders" = {
+    # ... configuración base
+    resource_policy = jsonencode({
+      Version = "2012-10-17"
+      Statement = [
+        {
+          Sid       = "AllowCrossAccountRead"
+          Effect    = "Allow"
+          Principal = { AWS = "arn:aws:iam::987654321098:root" }
+          Action    = ["dynamodb:GetItem", "dynamodb:Query"]
+          Resource  = "*"
+        }
+      ]
+    })
+  }
+}
+```
+
+### Breaking Changes
+- Ninguno - El campo `resource_policy` es opcional con default `null`
+
 ## [2.1.0] - 2026-04-13
 
 ### Added

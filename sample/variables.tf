@@ -168,6 +168,9 @@ variable "dynamo_config" {
       filter_pattern                     = optional(string, "")
     })), [])
 
+    # Resource-based Policy (opcional)
+    resource_policy = optional(string, null) # JSON de la resource-based policy
+
     functionality = string
   }))
 }

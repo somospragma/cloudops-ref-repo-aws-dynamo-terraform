@@ -1,7 +1,7 @@
 # **Módulo Terraform: cloudops-ref-repo-aws-dynamo-terraform**
 
-**Versión:** 2.0.0  
-**Última Actualización:** 24 de febrero de 2026
+**Versión:** 2.1.1  
+**Última Actualización:** 13 de agosto de 2026
 
 ## Descripción
 
@@ -23,6 +23,7 @@ Este módulo permite la creación y gestión completa de tablas DynamoDB en AWS,
 - ✅ **DynamoDB Streams** - Captura de cambios en tiempo real
 - ✅ **Time To Live (TTL)** - Eliminación automática de items expirados
 - ✅ **Lambda Triggers** - Event source mappings de DynamoDB Streams a Lambda
+- ✅ **Resource-based Policies** - Políticas de acceso cross-account a nivel de tabla
 
 Consulta `CHANGELOG.md` para la lista completa de cambios de cada versión. *Recomendamos encarecidamente que en tu código fijes la versión exacta que estás utilizando para que tu infraestructura permanezca estable y actualices las versiones de manera sistemática para evitar sorpresas.*
 
@@ -525,6 +526,75 @@ output "event_trigger_arn" {
 
 > **Nota:** `stream_enabled` debe ser `true` en la tabla para poder configurar `lambda_triggers`. El módulo valida esta dependencia automáticamente.
 
+### Ejemplo con Resource-based Policy (Cross-Account)
+
+```hcl
+module "dynamodb" {
+  source = "git::https://github.com/org/cloudops-ref-repo-aws-dynamo-terraform.git?ref=v2.1.1"
+  
+  providers = {
+    aws.project = aws.principal
+  }
+
+  client      = "pragma"
+  project     = "shared"
+  environment = "pdn"
+  application = "catalog"
+
+  dynamo_config = {
+    "shared-catalog" = {
+      billing_mode  = "PAY_PER_REQUEST"
+      hash_key      = "item_id"
+      functionality = "shared-catalog"
+
+      attributes = [
+        {
+          name = "item_id"
+          type = "S"
+        }
+      ]
+
+      server_side_encryption = {
+        enabled     = true
+        kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+      }
+
+      # Resource-based Policy para acceso cross-account
+      resource_policy = jsonencode({
+        Version = "2012-10-17"
+        Statement = [
+          {
+            Sid       = "AllowCrossAccountRead"
+            Effect    = "Allow"
+            Principal = { AWS = "arn:aws:iam::987654321098:root" }
+            Action = [
+              "dynamodb:GetItem",
+              "dynamodb:Query",
+              "dynamodb:BatchGetItem"
+            ]
+            Resource = "*"
+          }
+        ]
+      })
+
+      point_in_time_recovery      = true
+      deletion_protection_enabled = true
+    }
+  }
+}
+
+# Verificar la revisión de la policy
+output "catalog_policy_revision" {
+  value = module.dynamodb.table_resource_policy_revisions["shared-catalog"]
+}
+```
+
+**Notas sobre Resource Policies:**
+- El campo `resource_policy` es opcional (`null` por defecto — sin policy)
+- Debe ser un JSON válido (el módulo valida con `jsondecode`)
+- Útil para acceso cross-account sin necesidad de roles IAM intermedios
+- Soporta conditions, deny statements y restricciones por IP/VPC
+
 ## Requirements
 
 | Name | Version |
@@ -543,6 +613,7 @@ output "event_trigger_arn" {
 | Name | Type |
 |------|------|
 | [aws_dynamodb_table](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_table) | resource |
+| [aws_dynamodb_resource_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_resource_policy) | resource |
 | [aws_appautoscaling_target](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/appautoscaling_target) | resource |
 | [aws_appautoscaling_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/appautoscaling_policy) | resource |
 | [aws_lambda_event_source_mapping](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/lambda_event_source_mapping) | resource |
@@ -670,6 +741,9 @@ dynamo_config = {
       filter_pattern                     = optional(string, "")       # Patrón de filtrado de eventos
     })), [])
 
+    # Resource-based Policy (opcional)
+    resource_policy = optional(string, null)  # JSON de la policy para acceso cross-account
+
     # Etiquetas adicionales (opcional)
     additional_tags = optional(map(string), {})
   }
@@ -732,6 +806,7 @@ Ver `MIGRACION_GSI_KEY_SCHEMA.md` para guía completa de migración.
 | `table_lsi_names` | Map of Local Secondary Index names by table key | `map(list(string))` |
 | `autoscaling_read_policy_arns` | Map of Auto Scaling read policy ARNs by table key | `map(string)` |
 | `autoscaling_write_policy_arns` | Map of Auto Scaling write policy ARNs by table key | `map(string)` |
+| `table_resource_policy_revisions` | Map of DynamoDB resource policy revision IDs by table key | `map(string)` |
 | `lambda_trigger_arns` | Map of Lambda event source mapping ARNs by table-trigger key | `map(string)` |
 | `lambda_trigger_uuids` | Map of Lambda event source mapping UUIDs by table-trigger key | `map(string)` |
 
@@ -771,6 +846,7 @@ all_table_arns = module.dynamodb.table_arns
 - ✅ **Protección contra eliminación** - `prevent_destroy = true` por defecto
 - ✅ **Point-in-time recovery** - Habilitado por defecto
 - ✅ **Deletion protection** - Habilitado por defecto
+- ✅ **Resource-based Policies** - Políticas de acceso granular a nivel de tabla
 
 ### Nomenclatura (PC-IAC-003)
 - ✅ **Nomenclatura estándar** - `{client}-{project}-{environment}-ddb-{application}-{key}`
